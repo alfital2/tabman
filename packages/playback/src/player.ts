@@ -64,9 +64,14 @@ export class TabPlayer {
 
   play(score: Score, options: PlayOptions): void {
     this.stop();
-    const context = (this.context ??= this.createContext());
+    // A closed context (hot-reload teardown, dispose race) can never make
+    // sound again — recreate instead of silently reusing it.
+    let context = this.context;
+    if (!context || context.state === 'closed') {
+      context = this.context = this.createContext();
+    }
     if (context.state === 'suspended') {
-      void context.resume();
+      void context.resume().catch(() => undefined);
     }
 
     const schedule = scheduleScore(score, options.bpm, options.from);
