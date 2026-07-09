@@ -1,0 +1,17 @@
+{
+  "name": "tabkit",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "check": "pnpm typecheck && pnpm test",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "build": "pnpm typecheck && pnpm --filter @tabkit/web build",
+    "dev": "pnpm --filter @tabkit/web dev"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.3",
+    "vitest": "^3.2.4"
+  }
+}
