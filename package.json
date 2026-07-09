@@ -11,6 +11,7 @@
     "dev": "pnpm --filter @tabkit/web dev"
   },
   "devDependencies": {
+    "@types/node": "^26.1.1",
     "typescript": "^5.8.3",
     "vitest": "^3.2.4"
   }
