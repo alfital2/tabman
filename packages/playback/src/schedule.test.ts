@@ -103,6 +103,30 @@ describe('scheduleScore', () => {
     expect(last.ratio).toBeCloseTo(2 ** (4 / 12));
   });
 
+  it('slides step chromatically through every fret (quantized, not fretless)', () => {
+    const score = scoreOf(
+      createBar(FOUR_FOUR, [
+        createVoice([
+          createBeat(QUARTER, [createNote(2, 5, { articulations: [slide('shift')] })]), // G string 5 → 10
+          createBeat(QUARTER, [createNote(2, 10)]),
+        ]),
+      ]),
+    );
+    const source = scheduleScore(score, 120).events[0]!.notes[0]!;
+    const anchors = source.pitch!;
+    // 5 semitones → at least one hold+step anchor pair per fret
+    expect(anchors.length).toBeGreaterThanOrEqual(10);
+    // every intermediate fret's ratio appears exactly (chromatic staircase)
+    for (let semitone = 1; semitone <= 5; semitone++) {
+      const expected = 2 ** (semitone / 12);
+      expect(anchors.some((a) => Math.abs(a.ratio - expected) < 1e-9)).toBe(true);
+    }
+    // times stay monotonic
+    for (let i = 1; i < anchors.length; i++) {
+      expect(anchors[i]!.atSec).toBeGreaterThanOrEqual(anchors[i - 1]!.atSec);
+    }
+  });
+
   it('shift slide glides but re-picks the destination', () => {
     const score = scoreOf(
       createBar(FOUR_FOUR, [

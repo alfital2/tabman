@@ -53,7 +53,12 @@ interface BarPlan {
 
 interface PlacedBar extends BarPlan {
   x: number;
+  /** Horizontal space one beat/append slot occupies after justification. */
+  slotWidth: number;
 }
+
+/** Bars never stretch more than this, so a lone empty bar can't get absurd. */
+const MAX_JUSTIFY_SCALE = 3;
 
 interface NotePlacement {
   x: number;
@@ -175,8 +180,8 @@ export function layoutScore(score: Score, metrics: Metrics = DEFAULT_METRICS, op
 
   // Pass 2: flow bars into systems. A system always takes at least one bar so
   // a too-narrow container can never loop forever.
-  const systemsOfBars: PlacedBar[][] = [];
-  let current: PlacedBar[] = [];
+  const systemsOfBars: BarPlan[][] = [];
+  let current: BarPlan[] = [];
   let x = originX;
   for (const plan of plans) {
     if (current.length > 0 && x + plan.width > fillWidth - m.marginX) {
@@ -184,10 +189,28 @@ export function layoutScore(score: Score, metrics: Metrics = DEFAULT_METRICS, op
       current = [];
       x = originX;
     }
-    current.push({ ...plan, x });
+    current.push(plan);
     x += plan.width;
   }
   if (current.length > 0) systemsOfBars.push(current);
+
+  // Pass 2.5: justify — stretch each system's bars to fill the row width, so
+  // a short row (or a lone bar) never renders as a stub. Only meaningful when
+  // the width is bounded.
+  const placedSystems: PlacedBar[][] = systemsOfBars.map((systemPlans) => {
+    const natural = systemPlans.reduce((sum, p) => sum + p.width, 0);
+    const usable = Number.isFinite(fillWidth) ? fillWidth - m.marginX - originX : natural;
+    const scale = natural > 0 && usable > natural ? Math.min(MAX_JUSTIFY_SCALE, usable / natural) : 1;
+    let cursorX = originX;
+    return systemPlans.map((plan) => {
+      const width = plan.width * scale;
+      const fixed = m.barStartPad + m.barEndPad + (plan.showTimeSignature ? TIME_SIGNATURE_WIDTH : 0);
+      const slotCount = Math.max(1, beats(plan.bar).length + (plan.hasAppendSlot ? 1 : 0));
+      const placed: PlacedBar = { ...plan, x: cursorX, width, slotWidth: (width - fixed) / slotCount };
+      cursorX += width;
+      return placed;
+    });
+  });
 
   const primitives: Primitive[] = [];
   const beatBoxes: BeatBox[] = [];
@@ -235,10 +258,13 @@ export function layoutScore(score: Score, metrics: Metrics = DEFAULT_METRICS, op
     return stringYs;
   };
 
-  for (const systemBars of systemsOfBars) {
+  for (const systemBars of placedSystems) {
     const last = systemBars[systemBars.length - 1]!;
-    const endX = last.x + last.width;
-    contentRight = Math.max(contentRight, endX);
+    const barsEndX = last.x + last.width;
+    // Ruled lines always run the full row so every system reads as the same
+    // sheet of paper, even when its bars end early.
+    const endX = Number.isFinite(fillWidth) ? fillWidth - m.marginX : barsEndX;
+    contentRight = Math.max(contentRight, barsEndX);
     const stringYs = drawSystemChrome(top, endX);
     systems.push({ track: TRACK, top, stringYs });
     const bottom = top + staffHeight;
@@ -297,10 +323,11 @@ export function layoutScore(score: Score, metrics: Metrics = DEFAULT_METRICS, op
         y2: bottom,
       });
 
+      const slotWidth = placed.slotWidth;
       const boxRect = (cx: number) => ({
-        x: cx - m.beatWidth / 2,
+        x: cx - slotWidth / 2,
         y: top - m.staffLineGap,
-        width: m.beatWidth,
+        width: slotWidth,
         height: staffHeight + m.staffLineGap * 2,
       });
 
@@ -308,7 +335,7 @@ export function layoutScore(score: Score, metrics: Metrics = DEFAULT_METRICS, op
       const stemsAtLevel: Array<{ cx: number; levels: number } | null> = [];
 
       barBeats.forEach((beat, beatIndex) => {
-        const cx = contentX + beatIndex * m.beatWidth + m.beatWidth / 2;
+        const cx = contentX + beatIndex * slotWidth + slotWidth / 2;
         const box: BeatBox = { path: { track: TRACK, bar: barIndex, voice: VOICE, beat: beatIndex }, rect: boxRect(cx) };
         beatBoxes.push(box);
         slotBoxes.push(box);
@@ -385,9 +412,10 @@ export function layoutScore(score: Score, metrics: Metrics = DEFAULT_METRICS, op
       const flushRun = () => {
         if (run.length === 1) {
           const solo = run[0]!;
+          const beamletLength = Math.min(slotWidth, m.beatWidth) * 0.32;
           for (let level = 1; level <= solo.levels; level++) {
             const y = railY - (level - 1) * BEAM_SPACING;
-            primitives.push({ kind: 'line', role: 'beam', x1: solo.cx, y1: y, x2: solo.cx + m.beatWidth * 0.32, y2: y });
+            primitives.push({ kind: 'line', role: 'beam', x1: solo.cx, y1: y, x2: solo.cx + beamletLength, y2: y });
           }
         } else if (run.length > 1) {
           for (let i = 0; i < run.length - 1; i++) {
@@ -412,7 +440,7 @@ export function layoutScore(score: Score, metrics: Metrics = DEFAULT_METRICS, op
       flushRun();
 
       if (placed.hasAppendSlot) {
-        const cx = contentX + barBeats.length * m.beatWidth + m.beatWidth / 2;
+        const cx = contentX + barBeats.length * slotWidth + slotWidth / 2;
         slotBoxes.push({
           path: { track: TRACK, bar: barIndex, voice: VOICE, beat: barBeats.length },
           rect: boxRect(cx),

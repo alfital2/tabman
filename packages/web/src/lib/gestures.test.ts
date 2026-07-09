@@ -33,7 +33,7 @@ describe('resolveGesture', () => {
     expect(result).toEqual({ kind: 'select', rect: { x: 10, y: 40, width: 40, height: 50 } });
   });
 
-  it('single-note vertical drag re-strings; horizontal drags do not', () => {
+  it('single-note vertical drag re-strings; horizontal drag repositions in time', () => {
     const vertical = resolveGesture(
       input({
         mode: 'single',
@@ -47,7 +47,12 @@ describe('resolveGesture', () => {
     const horizontal = resolveGesture(
       input({ mode: 'single', startCell: cell(0, 0, 1), endCell: cell(1, 0, 1), end: { x: 60, y: 2 } }),
     );
-    expect(horizontal).toEqual({ kind: 'none' });
+    expect(horizontal).toEqual({ kind: 'moveToSlot', from: cell(0, 0, 1), target: cell(1, 0, 1) });
+
+    const samePlace = resolveGesture(
+      input({ mode: 'single', startCell: cell(0, 0, 1), endCell: cell(0, 0, 1), end: { x: 8, y: 1 } }),
+    );
+    expect(samePlace).toEqual({ kind: 'none' });
   });
 
   it('single drag back to the same string is a pick', () => {
@@ -64,11 +69,16 @@ describe('resolveGesture', () => {
     expect(result).toEqual({ kind: 'moveSelection', delta: 3 });
   });
 
-  it('group horizontal drag moves the selection to the bar under the pointer', () => {
+  it('group horizontal drag moves the selection to the slot under the pointer', () => {
     const result = resolveGesture(
       input({ mode: 'group', startCell: cell(0, 0, 1), endCell: cell(2, 1, 1), end: { x: 120, y: 4 } }),
     );
-    expect(result).toEqual({ kind: 'moveSelectionToBar', targetBar: 2 });
+    expect(result).toEqual({ kind: 'moveToSlot', from: cell(0, 0, 1), target: cell(2, 1, 1) });
+    // within the same bar too
+    const withinBar = resolveGesture(
+      input({ mode: 'group', startCell: cell(0, 0, 1), endCell: cell(0, 2, 1), end: { x: 60, y: 4 } }),
+    );
+    expect(withinBar).toEqual({ kind: 'moveToSlot', from: cell(0, 0, 1), target: cell(0, 2, 1) });
   });
 
   it('drags ending off the sheet resolve to none (except marquee)', () => {

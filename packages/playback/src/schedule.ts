@@ -87,6 +87,33 @@ const BEND_RATIO_PER_TONE = (tones: number) => 2 ** ((tones * 2) / 12);
 const TRANSITION_POINT = 0.6;
 const STEP_EPSILON = 0.008;
 
+/**
+ * A slide on a fretted instrument is not a smooth glissando — the pitch steps
+ * through every fret on the way. Emit a chromatic staircase: hold each
+ * semitone, then a very short ramp into the next one.
+ */
+function glideAnchors(startSec: number, endSec: number, fromRatio: number, toRatio: number): PitchAnchor[] {
+  const semitones = Math.round(12 * Math.log2(toRatio / fromRatio));
+  if (semitones === 0 || endSec <= startSec) {
+    return [
+      { atSec: startSec, ratio: fromRatio },
+      { atSec: endSec, ratio: toRatio },
+    ];
+  }
+  const steps = Math.abs(semitones);
+  const direction = Math.sign(semitones);
+  const slice = (endSec - startSec) / steps;
+  const snap = Math.min(0.012, slice * 0.35);
+  const anchors: PitchAnchor[] = [{ atSec: startSec, ratio: fromRatio }];
+  for (let k = 1; k <= steps; k++) {
+    const prevRatio = fromRatio * 2 ** ((direction * (k - 1)) / 12);
+    const ratio = fromRatio * 2 ** ((direction * k) / 12);
+    const at = startSec + k * slice;
+    anchors.push({ atSec: at - snap, ratio: prevRatio }, { atSec: at, ratio });
+  }
+  return anchors;
+}
+
 function isLegatoTransition(art: Articulation | undefined): art is Articulation {
   if (!art) return false;
   return art.type === 'hammerOn' || art.type === 'pullOff' || (art.type === 'slide' && art.style === 'legato');
@@ -174,9 +201,9 @@ export function scheduleScore(score: Score, bpm: number, from?: PlayFrom): Sched
         const transitionStart = offset - curDur * (1 - TRANSITION_POINT);
 
         if (transition === 'shift') {
-          // Glide to the destination; the destination is re-picked.
+          // Glide to the destination fret-by-fret; the destination is re-picked.
           cur.glideToMidi = target.midi;
-          anchors.push({ atSec: transitionStart, ratio }, { atSec: offset, ratio: targetRatio });
+          anchors.push(...glideAnchors(transitionStart, offset, ratio, targetRatio));
           break;
         }
 
@@ -184,7 +211,7 @@ export function scheduleScore(score: Score, bpm: number, from?: PlayFrom): Sched
         target.attack = false;
         const slideArt = getArticulation(cur.articulations, 'slide');
         if (slideArt && slideArt.type === 'slide' && slideArt.style === 'legato') {
-          anchors.push({ atSec: transitionStart, ratio }, { atSec: offset, ratio: targetRatio });
+          anchors.push(...glideAnchors(transitionStart, offset, ratio, targetRatio));
         } else {
           // hammer-on / pull-off: an instant pitch step at the boundary.
           anchors.push({ atSec: Math.max(0, offset - STEP_EPSILON), ratio }, { atSec: offset, ratio: targetRatio });

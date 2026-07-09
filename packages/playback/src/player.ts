@@ -180,12 +180,17 @@ export class TabPlayer {
 
     const envelope = context.createGain();
     envelope.gain.setValueAtTime(1, when);
-    const stopAt = when + note.sustainSec + 0.15;
-    envelope.gain.setTargetAtTime(0, when + note.sustainSec, 0.05);
+    // A shift-slide source must be silent the instant its destination is
+    // re-picked, or the arrival sounds doubled. Everything else gets a
+    // natural release tail.
+    const shiftSlideSource = note.glideToMidi !== undefined;
+    const releaseTau = shiftSlideSource ? 0.012 : 0.05;
+    const tail = shiftSlideSource ? 0.05 : 0.35;
+    envelope.gain.setTargetAtTime(0, when + note.sustainSec - (shiftSlideSource ? 0.01 : 0), releaseTau);
     source.connect(envelope);
     envelope.connect(bus);
     source.start(when);
-    source.stop(stopAt + 0.2);
+    source.stop(when + note.sustainSec + tail);
     this.sources.push(source);
     this.liveNodes.push(envelope);
   }

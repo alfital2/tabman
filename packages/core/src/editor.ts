@@ -10,6 +10,7 @@ import {
   createBeat,
   createNote,
   createVoice,
+  isBarOverfull,
   isRest,
   withScoreMeta,
   withTrackBars,
@@ -494,6 +495,91 @@ export function moveBeatsToBar(state: EditorState, cells: readonly Cell[], targe
   return commit(state, withBars(state.score, newBars), {
     bar: targetBar,
     beat: firstMovedIndex,
+    string: state.cursor.string,
+  });
+}
+
+export interface SlotTarget {
+  readonly bar: number;
+  readonly beat: number;
+}
+
+interface SlotPlan {
+  bars: Bar[];
+  /** Beat index each moved source landed on (in the target bar), in source order. */
+  targetPositions: number[];
+}
+
+/**
+ * Reposition notes in time: the selected notes leave their beats (which stay
+ * behind as rests, so nothing else shifts) and land on consecutive slots
+ * starting at `target` — merging into existing beats (target duration wins,
+ * same-string notes are replaced) or appending new beats, padding any gap
+ * with rests. Blocked when the target bar would overflow.
+ */
+function planNotesToSlot(score: Score, cells: readonly Cell[], target: SlotTarget): SlotPlan | null {
+  const allBars = track0(score).bars;
+  if (target.bar < 0 || target.bar >= allBars.length || target.beat < 0) return null;
+
+  const byBeat = new Map<string, { bar: number; beat: number; strings: Set<number> }>();
+  for (const cell of cells) {
+    if (!noteAt(score, cell)) continue;
+    const key = `${String(cell.bar)}:${String(cell.beat)}`;
+    let entry = byBeat.get(key);
+    if (!entry) byBeat.set(key, (entry = { bar: cell.bar, beat: cell.beat, strings: new Set() }));
+    entry.strings.add(cell.string);
+  }
+  const sources = [...byBeat.values()].sort((a, b) => a.bar - b.bar || a.beat - b.beat);
+  if (sources.length === 0) return null;
+  if (sources.length === 1 && sources[0]!.bar === target.bar && sources[0]!.beat === target.beat) return null;
+
+  const beatsByBar = allBars.map((bar) => [...voiceBeats(bar)]);
+
+  const moved: Array<{ notes: Note[]; duration: Beat['duration'] }> = [];
+  for (const src of sources) {
+    const beat = beatsByBar[src.bar]?.[src.beat];
+    if (!beat) continue;
+    const movingNotes = beat.notes.filter((n) => src.strings.has(n.string));
+    if (movingNotes.length === 0) continue;
+    moved.push({ notes: [...movingNotes], duration: beat.duration });
+    beatsByBar[src.bar]![src.beat] = createBeat(beat.duration, beat.notes.filter((n) => !src.strings.has(n.string)));
+  }
+  if (moved.length === 0) return null;
+
+  const targetBeats = beatsByBar[target.bar]!;
+  const targetPositions: number[] = [];
+  moved.forEach((piece, k) => {
+    const pos = target.beat + k;
+    if (pos < targetBeats.length) {
+      const existing = targetBeats[pos]!;
+      const movingStrings = new Set(piece.notes.map((n) => n.string));
+      targetBeats[pos] = createBeat(existing.duration, [
+        ...existing.notes.filter((n) => !movingStrings.has(n.string)),
+        ...piece.notes,
+      ]);
+    } else {
+      while (targetBeats.length < pos) targetBeats.push(createBeat(piece.duration, []));
+      targetBeats.push(createBeat(piece.duration, piece.notes));
+    }
+    targetPositions.push(pos);
+  });
+
+  const bars = allBars.map((bar, i) => withVoiceBeats(bar, beatsByBar[i]!));
+  if (isBarOverfull(bars[target.bar]!)) return null;
+  return { bars, targetPositions };
+}
+
+export function canMoveNotesToSlot(score: Score, cells: readonly Cell[], target: SlotTarget): boolean {
+  return planNotesToSlot(score, cells, target) !== null;
+}
+
+/** Drag notes to another beat position (same or another bar). */
+export function moveNotesToSlot(state: EditorState, cells: readonly Cell[], target: SlotTarget): EditorState {
+  const plan = planNotesToSlot(state.score, cells, target);
+  if (!plan) return state;
+  return commit(state, withBars(state.score, plan.bars), {
+    bar: target.bar,
+    beat: plan.targetPositions[0] ?? target.beat,
     string: state.cursor.string,
   });
 }

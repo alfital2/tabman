@@ -13,9 +13,9 @@ import {
   insertBarValue,
   MAX_HISTORY,
   midiToName,
-  moveBeatsToBar,
   moveCursor,
   moveNotesByStringDelta,
+  moveNotesToSlot,
   moveNoteToString,
   pasteBeatsAtCursor,
   placeCursor,
@@ -368,9 +368,21 @@ export function App(): JSX.Element {
                 }
                 apply(moved);
               }}
-              onMoveSelectionToBar={(targetBar) => {
-                const next = moveBeatsToBar(stateRef.current, selectionRef.current, targetBar);
-                if (next !== stateRef.current) clearSelection();
+              onMoveToSlot={(cells, target) => {
+                const next = moveNotesToSlot(stateRef.current, cells, target);
+                if (next !== stateRef.current) {
+                  // Keep the moved notes selected at their new positions.
+                  const sourceOrder = [...new Map(cells.map((c) => [`${String(c.bar)}:${String(c.beat)}`, c])).entries()]
+                    .sort(([, a], [, b]) => a.bar - b.bar || a.beat - b.beat)
+                    .map(([key]) => key);
+                  const indexByBeat = new Map(sourceOrder.map((key, i) => [key, i]));
+                  const remapped = cells.map((c) => ({
+                    bar: target.bar,
+                    beat: target.beat + (indexByBeat.get(`${String(c.bar)}:${String(c.beat)}`) ?? 0),
+                    string: c.string,
+                  }));
+                  setSelection(selectionRef.current.length > 0 ? remapped : []);
+                }
                 apply(next);
               }}
               onContextMenu={(x, y, cell) => {

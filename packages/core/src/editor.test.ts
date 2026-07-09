@@ -6,6 +6,7 @@ import {
   beatAt,
   beatsForCells,
   canMoveBeatsToBar,
+  canMoveNotesToSlot,
   canMoveNoteToString,
   clearAtCursor,
   createEditor,
@@ -16,6 +17,7 @@ import {
   moveBeatsToBar,
   moveCursor,
   moveNotesByStringDelta,
+  moveNotesToSlot,
   moveNoteToString,
   noteAt,
   pasteBeatsAtCursor,
@@ -278,6 +280,84 @@ describe('moveBeatsToBar', () => {
     state = setFretAtCursor(state, 5, QUARTER);
     expect(canMoveBeatsToBar(state.score, [{ bar: 0, beat: 0, string: 0 }], 1)).toBe(false);
     expect(moveBeatsToBar(state, [{ bar: 0, beat: 0, string: 0 }], 1)).toBe(state);
+  });
+});
+
+describe('moveNotesToSlot (drag in time)', () => {
+  it('moves two leading quarters to the back of the bar, leaving rests', () => {
+    let state = oneBarEditor();
+    state = setFretAtCursor(state, 5, QUARTER);
+    state = setFretAtCursor(moveCursor(state, 'right'), 7, QUARTER);
+    const cells = [
+      { bar: 0, beat: 0, string: 0 },
+      { bar: 0, beat: 1, string: 0 },
+    ];
+    // drag onto the append slot (index 2) → rests at 1–2, notes at 3–4
+    state = moveNotesToSlot(state, cells, { bar: 0, beat: 2 });
+    const beats = state.score.tracks[0]!.bars[0]!.voices[0]!.beats;
+    expect(beats.map((b) => b.notes.length)).toEqual([0, 0, 1, 1]);
+    expect(beats[2]!.notes[0]!.fret).toBe(5);
+    expect(beats[3]!.notes[0]!.fret).toBe(7);
+    expect(state.cursor).toEqual({ bar: 0, beat: 2, string: 0 });
+  });
+
+  it('moves notes backward by merging into existing rests', () => {
+    let state = oneBarEditor();
+    state = setFretAtCursor(state, 5, QUARTER);
+    state = setFretAtCursor(moveCursor(state, 'right'), 7, QUARTER);
+    state = moveNotesToSlot(
+      state,
+      [
+        { bar: 0, beat: 0, string: 0 },
+        { bar: 0, beat: 1, string: 0 },
+      ],
+      { bar: 0, beat: 2 },
+    );
+    // now bring them back to the front
+    state = moveNotesToSlot(
+      state,
+      [
+        { bar: 0, beat: 2, string: 0 },
+        { bar: 0, beat: 3, string: 0 },
+      ],
+      { bar: 0, beat: 0 },
+    );
+    const beats = state.score.tracks[0]!.bars[0]!.voices[0]!.beats;
+    expect(beats.map((b) => b.notes.length)).toEqual([1, 1, 0, 0]);
+    expect(beats[0]!.notes[0]!.fret).toBe(5);
+  });
+
+  it('moves notes into another bar', () => {
+    let state = setFretAtCursor(emptyEditor(), 5, QUARTER);
+    state = moveNotesToSlot(state, [{ bar: 0, beat: 0, string: 0 }], { bar: 2, beat: 0 });
+    expect(beatAt(state.score, 2, 0)!.notes[0]!.fret).toBe(5);
+    expect(isRest(beatAt(state.score, 0, 0)!)).toBe(true);
+  });
+
+  it('merging replaces same-string notes but keeps other strings', () => {
+    let state = setFretAtCursor(emptyEditor(), 5); // beat 0 string 0
+    state = placeCursor(state, { bar: 0, beat: 1, string: 0 });
+    state = setFretAtCursor(state, 7);
+    state = placeCursor(state, { bar: 0, beat: 1, string: 2 });
+    state = setFretAtCursor(state, 9);
+    // drag beat 0's note onto beat 1: replaces the string-0 note, keeps string-2
+    state = moveNotesToSlot(state, [{ bar: 0, beat: 0, string: 0 }], { bar: 0, beat: 1 });
+    const beat = beatAt(state.score, 0, 1)!;
+    expect(beat.notes.map((n) => [n.string, n.fret])).toEqual([
+      [0, 5],
+      [2, 9],
+    ]);
+  });
+
+  it('blocks when the target bar would overflow, and no-ops onto itself', () => {
+    const small = createEditor(
+      createScore({ tracks: [createTrack({ bars: [createBar(createTimeSignature(2, 4)), createBar(createTimeSignature(2, 4))] })] }),
+    );
+    let state = setFretAtCursor(small, 5, HALF); // fills bar 0
+    expect(canMoveNotesToSlot(state.score, [{ bar: 0, beat: 0, string: 0 }], { bar: 0, beat: 1 })).toBe(false);
+    expect(canMoveNotesToSlot(state.score, [{ bar: 0, beat: 0, string: 0 }], { bar: 0, beat: 0 })).toBe(false);
+    expect(canMoveNotesToSlot(state.score, [{ bar: 0, beat: 0, string: 0 }], { bar: 1, beat: 0 })).toBe(true);
+    expect(moveNotesToSlot(state, [{ bar: 0, beat: 0, string: 0 }], { bar: 0, beat: 1 })).toBe(state);
   });
 });
 

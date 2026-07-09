@@ -25,7 +25,7 @@ export type GestureResult =
   | { kind: 'select'; rect: SelectionRect }
   | { kind: 'moveNote'; from: HitCell; toString: number }
   | { kind: 'moveSelection'; delta: number }
-  | { kind: 'moveSelectionToBar'; targetBar: number }
+  | { kind: 'moveToSlot'; from: HitCell; target: HitCell }
   | { kind: 'none' };
 
 export function normalizedRect(a: { x: number; y: number }, b: { x: number; y: number }): SelectionRect {
@@ -41,9 +41,10 @@ export function normalizedRect(a: { x: number; y: number }, b: { x: number; y: n
  * Decide what a completed pointer gesture means. Pure so every branch is
  * testable without a DOM:
  * - marquee (down on empty space): drag = selection box, near-stationary = pick
- * - single (down on an unselected note): vertical drag = re-string, click = pick
+ * - single (down on an unselected note): vertical drag = re-string, horizontal
+ *   drag = move the note in time to the slot under the pointer, click = pick
  * - group (down on a selected note): vertical drag = shift selection by strings,
- *   horizontal drag = move the selection to the bar under the pointer
+ *   horizontal drag = move the selection to the slot under the pointer
  */
 export function resolveGesture(input: GestureInput): GestureResult {
   const dx = input.end.x - input.start.x;
@@ -55,23 +56,25 @@ export function resolveGesture(input: GestureInput): GestureResult {
     return cell ? { kind: 'pick', cell } : { kind: 'none' };
   }
 
-  switch (input.mode) {
-    case 'marquee':
-      return { kind: 'select', rect: normalizedRect(input.start, input.end) };
-    case 'single': {
-      if (!input.startCell || !input.endCell) return { kind: 'none' };
-      if (Math.abs(dy) < Math.abs(dx)) return { kind: 'none' }; // horizontal drags don't re-string
+  if (input.mode === 'marquee') {
+    return { kind: 'select', rect: normalizedRect(input.start, input.end) };
+  }
+
+  if (!input.startCell || !input.endCell) return { kind: 'none' };
+
+  if (Math.abs(dy) >= Math.abs(dx)) {
+    // Vertical: re-string.
+    if (input.mode === 'single') {
       if (input.endCell.string === input.startCell.string) return { kind: 'pick', cell: input.startCell };
       return { kind: 'moveNote', from: input.startCell, toString: input.endCell.string };
     }
-    case 'group': {
-      if (!input.startCell || !input.endCell) return { kind: 'none' };
-      if (Math.abs(dy) >= Math.abs(dx)) {
-        const delta = input.endCell.string - input.startCell.string;
-        return delta === 0 ? { kind: 'none' } : { kind: 'moveSelection', delta };
-      }
-      if (input.endCell.bar === input.startCell.bar) return { kind: 'none' };
-      return { kind: 'moveSelectionToBar', targetBar: input.endCell.bar };
-    }
+    const delta = input.endCell.string - input.startCell.string;
+    return delta === 0 ? { kind: 'none' } : { kind: 'moveSelection', delta };
   }
+
+  // Horizontal: reposition in time onto the slot under the pointer.
+  if (input.endCell.bar === input.startCell.bar && input.endCell.beat === input.startCell.beat) {
+    return { kind: 'none' };
+  }
+  return { kind: 'moveToSlot', from: input.startCell, target: input.endCell };
 }

@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { JSX, PointerEvent as ReactPointerEvent, MouseEvent as ReactMouseEvent } from 'react';
 import {
-  canMoveBeatsToBar,
   canMoveNotesByStringDelta,
+  canMoveNotesToSlot,
   canMoveNoteToString,
   noteAt,
   type Cell,
@@ -35,7 +35,7 @@ export interface TabSheetProps {
   onSelect(cells: Cell[]): void;
   onMoveNote(from: Cell, toString: number): void;
   onMoveSelection(delta: number): void;
-  onMoveSelectionToBar(targetBar: number): void;
+  onMoveToSlot(cells: readonly Cell[], target: HitCell): void;
   onContextMenu(clientX: number, clientY: number, cell: HitCell): void;
 }
 
@@ -203,8 +203,8 @@ export function TabSheet(props: TabSheetProps): JSX.Element {
       case 'moveSelection':
         props.onMoveSelection(result.delta);
         break;
-      case 'moveSelectionToBar':
-        props.onMoveSelectionToBar(result.targetBar);
+      case 'moveToSlot':
+        props.onMoveToSlot(drag.mode === 'group' ? selection : [result.from], result.target);
         break;
       case 'none':
         break;
@@ -281,7 +281,21 @@ export function TabSheet(props: TabSheetProps): JSX.Element {
   if (drag && drag.endCell && (Math.abs(drag.end.x - drag.start.x) > CLICK_SLOP || Math.abs(drag.end.y - drag.start.y) > CLICK_SLOP)) {
     const dx = Math.abs(drag.end.x - drag.start.x);
     const dy = Math.abs(drag.end.y - drag.start.y);
-    if (drag.mode === 'single' && drag.startCell && dy >= dx && drag.endCell.string !== drag.startCell.string) {
+    const horizontal = dx > dy;
+    if (drag.mode !== 'marquee' && drag.startCell && horizontal) {
+      // Reposition-in-time preview: tint the slot column under the pointer.
+      const movingCells = drag.mode === 'group' ? selection : [drag.startCell];
+      const notSame = drag.endCell.bar !== drag.startCell.bar || drag.endCell.beat !== drag.startCell.beat;
+      if (notSame) {
+        const ok = canMoveNotesToSlot(state.score, movingCells, drag.endCell);
+        const rect = slotRect(layout, drag.endCell.bar, drag.endCell.beat);
+        if (rect) {
+          topOverlays.push(
+            <rect key="preview-slot" x={rect.x} y={rect.y} width={rect.width} height={rect.height} fill={ok ? '#16a34a' : '#dc2626'} opacity={0.25} rx={2} />,
+          );
+        }
+      }
+    } else if (drag.mode === 'single' && drag.startCell && drag.endCell.string !== drag.startCell.string) {
       const ok = canMoveNoteToString(state.score, drag.startCell, drag.endCell.string);
       const rect = cellRect(layout, { ...drag.startCell, string: drag.endCell.string });
       if (rect) {
@@ -290,30 +304,16 @@ export function TabSheet(props: TabSheetProps): JSX.Element {
         );
       }
     } else if (drag.mode === 'group' && drag.startCell) {
-      if (dy >= dx) {
-        const delta = drag.endCell.string - drag.startCell.string;
-        if (delta !== 0) {
-          const ok = canMoveNotesByStringDelta(state.score, selection, delta);
-          for (const cell of selection) {
-            const rect = cellRect(layout, { ...cell, string: cell.string + delta });
-            if (rect) {
-              topOverlays.push(
-                <rect key={`preview-${cellKey(cell)}`} x={rect.x} y={rect.y} width={rect.width} height={rect.height} fill={ok ? '#16a34a' : '#dc2626'} opacity={0.32} rx={2} />,
-              );
-            }
+      const delta = drag.endCell.string - drag.startCell.string;
+      if (delta !== 0) {
+        const ok = canMoveNotesByStringDelta(state.score, selection, delta);
+        for (const cell of selection) {
+          const rect = cellRect(layout, { ...cell, string: cell.string + delta });
+          if (rect) {
+            topOverlays.push(
+              <rect key={`preview-${cellKey(cell)}`} x={rect.x} y={rect.y} width={rect.width} height={rect.height} fill={ok ? '#16a34a' : '#dc2626'} opacity={0.32} rx={2} />,
+            );
           }
-        }
-      } else if (drag.endCell.bar !== drag.startCell.bar) {
-        const ok = canMoveBeatsToBar(state.score, selection, drag.endCell.bar);
-        const barBoxes = layout.slots.filter((s) => s.path.bar === drag.endCell!.bar);
-        if (barBoxes.length > 0) {
-          const x1 = Math.min(...barBoxes.map((b) => b.rect.x));
-          const x2 = Math.max(...barBoxes.map((b) => b.rect.x + b.rect.width));
-          const y1 = Math.min(...barBoxes.map((b) => b.rect.y));
-          const y2 = Math.max(...barBoxes.map((b) => b.rect.y + b.rect.height));
-          topOverlays.push(
-            <rect key="preview-bar" x={x1} y={y1} width={x2 - x1} height={y2 - y1} fill={ok ? '#16a34a' : '#dc2626'} opacity={0.18} rx={3} />,
-          );
         }
       }
     } else if (drag.mode === 'marquee') {
