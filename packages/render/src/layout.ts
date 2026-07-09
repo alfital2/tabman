@@ -90,8 +90,52 @@ function beats(bar: Bar): readonly Beat[] {
   return bar.voices[VOICE]?.beats ?? [];
 }
 
-/** 8th = 1 beam, 16th = 2, 32nd = 3, 64th = 4; longer values don't beam. */
+function circlePath(cx: number, cy: number, r: number): string {
+  return `M ${String(cx - r)} ${String(cy)} a ${String(r)} ${String(r)} 0 1 0 ${String(r * 2)} 0 a ${String(r)} ${String(r)} 0 1 0 ${String(-r * 2)} 0 Z`;
+}
+
+/**
+ * Vector rest shapes (font music glyphs are unreliable across platforms):
+ * whole = block hanging under the mid line, half = block sitting on it,
+ * quarter = the classic squiggle, 8th/16th/32nd/64th = slash with 1–4 hooks.
+ */
+function restPaths(cx: number, y0: number, value: number): Array<{ d: string; filled: boolean }> {
+  if (value === 1) {
+    return [{ d: `M ${String(cx - 3)} ${String(y0)} h 6 v 2.4 h -6 Z`, filled: true }];
+  }
+  if (value === 2) {
+    return [{ d: `M ${String(cx - 3)} ${String(y0 - 2.4)} h 6 v 2.4 h -6 Z`, filled: true }];
+  }
+  if (value === 4) {
+    return [
+      {
+        d: `M ${String(cx - 1.3)} ${String(y0 - 4.8)} L ${String(cx + 1.7)} ${String(y0 - 1.6)} L ${String(cx - 0.7)} ${String(y0 + 0.9)} L ${String(cx + 1.7)} ${String(y0 + 3.6)} Q ${String(cx - 1.2)} ${String(y0 + 2.2)} ${String(cx - 1.2)} ${String(y0 + 4.9)}`,
+        filled: false,
+      },
+    ];
+  }
+  const flags = value === 8 ? 1 : value === 16 ? 2 : value === 32 ? 3 : 4;
+  const top = y0 - 3.2;
+  const height = 6.4 + (flags - 1) * 1.6;
+  const paths: Array<{ d: string; filled: boolean }> = [
+    { d: `M ${String(cx + 1.9)} ${String(top)} L ${String(cx - 1.9)} ${String(top + height)}`, filled: false },
+  ];
+  for (let k = 0; k < flags; k++) {
+    const hookY = top + 0.9 + k * 2.3;
+    // x of the slash at this height, hooks hang off its left side
+    const attachX = cx + 1.9 - 3.8 * ((hookY - top) / height);
+    paths.push({ d: circlePath(attachX - 2.5, hookY + 0.9, 1.05), filled: true });
+    paths.push({
+      d: `M ${String(attachX - 2.1)} ${String(hookY + 1.3)} Q ${String(attachX - 0.8)} ${String(hookY + 1.9)} ${String(attachX)} ${String(hookY)}`,
+      filled: false,
+    });
+  }
+  return paths;
+}
+
+/** 8th = 1 beam, 16th = 2, 32nd = 3, 64th = 4; longer values (and rests) don't beam. */
 function beamLevels(beat: Beat): number {
+  if (beat.notes.length === 0) return 0; // rests break beam groups
   switch (beat.duration.value) {
     case 8:
       return 1;
@@ -269,8 +313,23 @@ export function layoutScore(score: Score, metrics: Metrics = DEFAULT_METRICS, op
         beatBoxes.push(box);
         slotBoxes.push(box);
 
-        // Stems: none for wholes, half-length for halves, full otherwise.
         const value = beat.duration.value;
+        const isRestBeat = beat.notes.length === 0;
+
+        if (isRestBeat) {
+          // Rest: a vector glyph centered on the staff — no stem, no beam.
+          const restY = top + staffHeight / 2;
+          for (const piece of restPaths(cx, restY, value)) {
+            primitives.push({ kind: 'path', role: 'rest', d: piece.d, filled: piece.filled });
+          }
+          for (let dot = 0; dot < beat.duration.dots; dot++) {
+            primitives.push({ kind: 'ellipse', role: 'dot', cx: cx + 5.5 + dot * 4, cy: restY - 2, rx: 1.3, ry: 1.3, filled: true });
+          }
+          stemsAtLevel.push({ cx, levels: 0 });
+          return;
+        }
+
+        // Stems: none for wholes, half-length for halves, full otherwise.
         if (value >= 2) {
           const stemTop = bottom + 3;
           const stemBottom = value === 2 ? bottom + 3 + (STEM_DROP - 3) / 2 : railY;
@@ -282,20 +341,6 @@ export function layoutScore(score: Score, metrics: Metrics = DEFAULT_METRICS, op
           }
         }
         stemsAtLevel.push({ cx, levels: beamLevels(beat) });
-
-        if (beat.notes.length === 0) {
-          // Rest: a hollow marker on the middle of the staff.
-          primitives.push({
-            kind: 'ellipse',
-            role: 'dot',
-            cx,
-            cy: top + staffHeight / 2,
-            rx: 2.6,
-            ry: 1.9,
-            filled: false,
-          });
-          return;
-        }
 
         for (const note of beat.notes) {
           const y = stringYs[Math.min(note.string, stringCount - 1)]!;

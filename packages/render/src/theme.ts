@@ -91,6 +91,11 @@ export function ellipseStyle(theme: Theme, filled: boolean): FillStrokeStyle {
 }
 
 export function pathStyle(theme: Theme, role: PathRole, filled: boolean | undefined): FillStrokeStyle {
+  if (role === 'rest') {
+    return filled
+      ? { fill: theme.clef, stroke: 'none', strokeWidth: 0 }
+      : { fill: 'none', stroke: theme.clef, strokeWidth: 1.3 };
+  }
   const color = theme.articulation;
   if (role === 'bend' && filled) {
     return { fill: color, stroke: 'none', strokeWidth: 0 };

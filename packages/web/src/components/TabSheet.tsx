@@ -117,7 +117,9 @@ export function TabSheet(props: TabSheetProps): JSX.Element {
     if (!wrap) return;
     const area = wrap.closest('.sheet-area');
     const measure = () => {
-      const width = wrap.clientWidth;
+      const style = getComputedStyle(wrap);
+      const padX = parseFloat(style.paddingLeft) + parseFloat(style.paddingRight);
+      const width = wrap.clientWidth - padX;
       const height = area instanceof HTMLElement ? area.clientHeight - 150 : 640;
       setFill((prev) => (prev.width === width && prev.height === height ? prev : { width, height }));
     };
@@ -139,6 +141,19 @@ export function TabSheet(props: TabSheetProps): JSX.Element {
     [state.score, fill],
   );
 
+  // While a gesture is live, no part of the page should highlight as text.
+  useEffect(() => {
+    if (!drag) return;
+    const body = document.body;
+    const previous = body.style.userSelect;
+    body.style.userSelect = 'none';
+    body.style.webkitUserSelect = 'none';
+    return () => {
+      body.style.userSelect = previous;
+      body.style.webkitUserSelect = previous;
+    };
+  }, [drag !== null]);
+
   const primitives = useMemo(() => layout.primitives.map(primitiveNode), [layout]);
 
   const toLayoutPoint = (event: { clientX: number; clientY: number }) => {
@@ -150,8 +165,9 @@ export function TabSheet(props: TabSheetProps): JSX.Element {
 
   const selectionKeys = useMemo(() => new Set(selection.map(cellKey)), [selection]);
 
-  const onPointerDown = (event: ReactPointerEvent<SVGSVGElement>) => {
+  const onPointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
     if (event.button !== 0) return;
+    event.preventDefault(); // no native text-selection from the sheet
     const point = toLayoutPoint(event);
     const cell = hitTest(layout, point.x, point.y);
     const mode: GestureMode =
@@ -164,7 +180,7 @@ export function TabSheet(props: TabSheetProps): JSX.Element {
     event.currentTarget.setPointerCapture(event.pointerId);
   };
 
-  const onPointerMove = (event: ReactPointerEvent<SVGSVGElement>) => {
+  const onPointerMove = (event: ReactPointerEvent<HTMLDivElement>) => {
     if (!drag) return;
     const point = toLayoutPoint(event);
     setDrag({ ...drag, end: point, endCell: hitTest(layout, point.x, point.y) });
@@ -195,7 +211,7 @@ export function TabSheet(props: TabSheetProps): JSX.Element {
     }
   };
 
-  const onContextMenu = (event: ReactMouseEvent<SVGSVGElement>) => {
+  const onContextMenu = (event: ReactMouseEvent<HTMLDivElement>) => {
     event.preventDefault();
     const point = toLayoutPoint(event);
     const cell = hitTest(layout, point.x, point.y);
@@ -344,21 +360,24 @@ export function TabSheet(props: TabSheetProps): JSX.Element {
   }
 
   return (
-    <div className="tab-sheet-svg" ref={wrapRef}>
+    <div
+      className="tab-sheet-svg"
+      ref={wrapRef}
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onPointerUp={onPointerUp}
+      onPointerCancel={() => {
+        setDrag(null);
+      }}
+      onContextMenu={onContextMenu}
+      role="application"
+      aria-label="Guitar tablature editor"
+    >
       <svg
         ref={svgRef}
         width={layout.width * SCALE}
         height={layout.height * SCALE}
         viewBox={`0 0 ${String(layout.width)} ${String(layout.height)}`}
-        onPointerDown={onPointerDown}
-        onPointerMove={onPointerMove}
-        onPointerUp={onPointerUp}
-        onPointerCancel={() => {
-          setDrag(null);
-        }}
-        onContextMenu={onContextMenu}
-        role="application"
-        aria-label="Guitar tablature editor"
       >
         {overlays}
         {primitives}

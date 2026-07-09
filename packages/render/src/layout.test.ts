@@ -118,7 +118,7 @@ describe('layoutScore', () => {
     const broken = layoutScore(
       scoreWithBeats([
         createBeat(EIGHTH, [createNote(0, 1)]),
-        createRest(QUARTER),
+        createRest(EIGHTH), // even a beamable value breaks the group when it is a rest
         createBeat(EIGHTH, [createNote(0, 2)]),
       ]),
     );
@@ -127,13 +127,24 @@ describe('layoutScore', () => {
     expect(brokenBeams).toHaveLength(2);
   });
 
-  it('draws duration dots and rest markers', () => {
+  it('draws duration dots, and rests as stemless vector glyphs', () => {
     const layout = layoutScore(
       scoreWithBeats([createBeat(createDuration(4, { dots: 1 }), [createNote(0, 0)]), createRest(QUARTER)]),
     );
     const dots = layout.primitives.filter((p) => p.kind === 'ellipse');
     expect(dots.some((d) => d.kind === 'ellipse' && d.filled)).toBe(true); // duration dot
-    expect(dots.some((d) => d.kind === 'ellipse' && !d.filled)).toBe(true); // rest marker
+    const rests = layout.primitives.filter((p) => p.kind === 'path' && p.role === 'rest');
+    expect(rests.length).toBeGreaterThanOrEqual(1);
+    // one stem for the note, none for the rest
+    const stems = layout.primitives.filter((p) => p.kind === 'line' && p.role === 'stem');
+    expect(stems).toHaveLength(1);
+  });
+
+  it('every rest value renders a distinct shape', () => {
+    for (const value of [1, 2, 4, 8, 16, 32, 64] as const) {
+      const layout = layoutScore(scoreWithBeats([createRest(createDuration(value))]));
+      expect(layout.primitives.some((p) => p.kind === 'path' && p.role === 'rest')).toBe(true);
+    }
   });
 
   it('emits ornaments: bend arrow with label, slide line, vibrato wave, h label', () => {

@@ -22,7 +22,8 @@ export function cellsInRect(score: Score, layout: Layout, rect: SelectionRect): 
     });
     if (!system) continue;
     system.stringYs.forEach((sy, stringIndex) => {
-      if (sy < rect.y - layout.stringGap / 2 || sy > rect.y + rect.height + layout.stringGap / 2) return;
+      const tolerance = layout.stringGap * 0.75;
+      if (sy < rect.y - tolerance || sy > rect.y + rect.height + tolerance) return;
       const cell: Cell = { bar: box.path.bar, beat: box.path.beat, string: stringIndex };
       if (noteAt(score, cell)) cells.push(cell);
     });

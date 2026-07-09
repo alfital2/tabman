@@ -51,6 +51,17 @@ body {
   padding: 28px 26px 40px;
 }
 
+/* The gesture surface reclaims the paper padding, so a marquee can start
+   anywhere on the page — not just exactly over the grid. */
+.tab-sheet-svg {
+  margin: 0 -26px -40px;
+  padding: 10px 26px 60px;
+  min-height: 240px;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
 .tab-sheet-svg svg {
   display: block;
   touch-action: none;
