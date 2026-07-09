@@ -7,11 +7,13 @@
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:e2e": "node e2e/smoke.mjs",
     "build": "pnpm typecheck && pnpm --filter @tabkit/web build",
     "dev": "pnpm --filter @tabkit/web dev"
   },
   "devDependencies": {
     "@types/node": "^26.1.1",
+    "playwright": "1.61.1",
     "typescript": "^5.8.3",
     "vitest": "^3.2.4"
   }

@@ -318,6 +318,11 @@ export function moveCursor(state: EditorState, direction: Direction): EditorStat
       } else if (bar < bars.length - 1) {
         bar += 1;
         beat = 0;
+      } else {
+        // At the very end of the score: grow the page with a fresh bar so
+        // entry never dead-ends. Undoable like any other bar edit.
+        const grown = appendBar(state);
+        return placeCursor(grown, { bar: bars.length, beat: 0, string });
       }
       break;
   }

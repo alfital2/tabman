@@ -215,6 +215,32 @@ describe('cursor movement', () => {
     expect(state.cursor.string).toBe(5);
   });
 
+  it('right at the very end of the score appends a new bar (undoable)', () => {
+    let state = oneBarEditor();
+    for (let i = 0; i < 4; i++) {
+      state = setFretAtCursor(state, i, QUARTER);
+      state = moveCursor(state, 'right');
+    }
+    // four quarters filled the only bar; the last right grew the score
+    expect(state.score.tracks[0]!.bars).toHaveLength(2);
+    expect(state.cursor).toEqual({ bar: 1, beat: 0, string: 0 });
+    // entry continues seamlessly in the new bar
+    state = setFretAtCursor(state, 7, QUARTER);
+    expect(beatAt(state.score, 1, 0)!.notes[0]!.fret).toBe(7);
+    // and the growth is a normal undoable edit
+    state = undo(state); // the note
+    state = undo(state); // the appended bar
+    expect(state.score.tracks[0]!.bars).toHaveLength(1);
+    expect(state.cursor.bar).toBe(0);
+  });
+
+  it('right through empty bars grows the score past the last one', () => {
+    let state = emptyEditor(); // 4 empty bars
+    for (let i = 0; i < 4; i++) state = moveCursor(state, 'right');
+    expect(state.score.tracks[0]!.bars).toHaveLength(5);
+    expect(state.cursor).toEqual({ bar: 4, beat: 0, string: 0 });
+  });
+
   it('a full bar has no append slot', () => {
     let state = oneBarEditor();
     state = setFretAtCursor(state, 0, WHOLE);
