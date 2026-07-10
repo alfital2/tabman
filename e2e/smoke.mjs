@@ -74,7 +74,7 @@ check('cmd+shift+z redoes', (await svg.locator('text', { hasText: /^9$/ }).count
 // 6. Articulation via panel: select note first (click the "12" fret)
 const twelve = svg.locator('text', { hasText: /^12$/ }).first();
 await twelve.click();
-const palmMute = page.locator('button', { hasText: 'Palm mute' });
+const palmMute = page.locator('.tb-icon[title="Palm mute"]');
 await palmMute.click();
 await page.waitForTimeout(100);
 check('palm mute label renders', (await svg.locator('text', { hasText: /PM/ }).count()) >= 1);
@@ -85,8 +85,8 @@ await page.waitForTimeout(100);
 check('palm mute toggles off', (await svg.locator('text', { hasText: /PM/ }).count()) === 0);
 
 // bend popover with variant
-await page.locator('button', { hasText: /^Bend$/ }).click();
-await page.locator('.popover button', { hasText: '1½' }).click();
+await page.locator('.tb-icon[title^="Bend"]').click();
+await page.locator('.tb-popover button', { hasText: '1½' }).click();
 await page.waitForTimeout(100);
 check('bend 1½ ornament renders', (await svg.locator('text', { hasText: /^1½$/ }).count()) >= 1);
 
@@ -102,7 +102,7 @@ check('duplicate bar adds fret copy', (await svg.locator('text', { hasText: /^12
 check('context menu closed after action', (await page.locator('.context-menu').count()) === 0);
 
 // 8. Demo scores
-await page.locator('button', { hasText: 'Load feature showcase' }).click();
+await page.locator('.tb-icon[title="Feature showcase"]').click();
 await page.waitForTimeout(300);
 const title = await page.locator('.sheet-title').inputValue();
 check('showcase loads', title === 'Feature Showcase', title);
@@ -111,15 +111,15 @@ check('dead note renders as x', (await svg.locator('text', { hasText: /^x$/ }).c
 check('time signature 3/4 change renders', (await svg.locator('text', { hasText: /^3$/ }).count()) >= 1);
 
 // 9. Playback
-await page.locator('.play-button').click();
+await page.locator('.tb-play').click();
 await page.waitForTimeout(700);
-const playing = await page.locator('.play-button').textContent();
+const playing = await page.locator('.tb-play').textContent();
 check('play starts (button shows Stop)', playing.includes('Stop'), playing.trim());
 const playheadVisible = await svg.locator('.playing-mark').count();
 check('playhead column follows', playheadVisible === 1);
-await page.locator('.play-button').click();
+await page.locator('.tb-play').click();
 await page.waitForTimeout(200);
-check('stop works', (await page.locator('.play-button').textContent()).includes('Play'));
+check('stop works', (await page.locator('.tb-play').textContent()).includes('Play'));
 
 // 10. Persistence across reload
 await page.locator('.sheet-title').fill('Persisted Song');
@@ -130,7 +130,7 @@ const persisted = await page.locator('.sheet-title').inputValue();
 check('document persists across reload', persisted === 'Persisted Song', persisted);
 
 // 11. Marquee select + delete
-await page.locator('button', { hasText: 'Demo riff' }).click();
+await page.locator('.tb-icon[title="Demo riff"]').click();
 await page.waitForTimeout(300);
 const box = await svg.boundingBox();
 await page.mouse.move(box.x + 40, box.y + 60);
@@ -142,7 +142,7 @@ const selText = await page.locator('.statusbar').textContent();
 check('marquee selects notes', /selected/.test(selText), selText.trim().slice(0, 60));
 
 // 12. Fill the whole score and keep going — the page must grow, never dead-end
-await page.locator('button', { hasText: /^New$/ }).click();
+await page.locator('.tb-icon[title="New"]').click();
 await page.waitForTimeout(250);
 await page.locator('body').click({ position: { x: 10, y: 10 } });
 for (let i = 0; i < 17; i++) {
@@ -159,19 +159,19 @@ const statusEnd = await page.locator('.statusbar').textContent();
 check('cursor continued into the new bar', /Bar [56]/.test(statusEnd), statusEnd.trim().slice(0, 40));
 
 // 12b. Fresh-doc cursor box is compact (justification slot cap)
-await page.locator('button', { hasText: /^New$/ }).click();
+await page.locator('.tb-icon[title="New"]').click();
 await page.waitForTimeout(200);
 const caretW = await page.evaluate(() => document.querySelector('.cursor-caret')?.getBoundingClientRect().width ?? 999);
 check('fresh cursor box is compact (not stretched)', caretW < 75, `${Math.round(caretW)}px`);
 
 // 12c. Slide popover opens fully on-screen (fixed, viewport-clamped)
-await page.locator('button', { hasText: 'Demo riff' }).click();
+await page.locator('.tb-icon[title="Demo riff"]').click();
 await page.waitForTimeout(200);
 await svg.locator('text', { hasText: /^5$/ }).first().click();
-await page.locator('button', { hasText: /^Slide$/ }).click();
+await page.locator('.tb-icon[title^="Slide"]').click();
 await page.waitForTimeout(150);
 const popOnScreen = await page.evaluate(() => {
-  const p = document.querySelector('.popover');
+  const p = document.querySelector('.tb-popover');
   if (!p) return false;
   const r = p.getBoundingClientRect();
   return r.right <= window.innerWidth && r.left >= 0 && getComputedStyle(p).position === 'fixed';
@@ -179,7 +179,7 @@ const popOnScreen = await page.evaluate(() => {
 check('slide popover fully on-screen', popOnScreen);
 await page.keyboard.press('Escape');
 await page.waitForTimeout(100);
-check('Escape closes popover', (await page.locator('.popover').count()) === 0);
+check('Escape closes popover', (await page.locator('.tb-popover').count()) === 0);
 
 // 12d. Global shortcuts are swallowed while the context menu is open
 await svg.locator('text', { hasText: /^0$/ }).first().click({ button: 'right' });
@@ -194,7 +194,7 @@ check('Escape closes the context menu', (await page.locator('.context-menu').cou
 // 13. Export produces a download
 const [download] = await Promise.all([
   page.waitForEvent('download', { timeout: 5000 }),
-  page.locator('button', { hasText: 'Export' }).click(),
+  page.locator('.tb-icon[title^="Export"]').click(),
 ]);
 check('export downloads a file', download.suggestedFilename().endsWith('.tabkit.json'), download.suggestedFilename());
 

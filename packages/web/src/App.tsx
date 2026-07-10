@@ -43,7 +43,7 @@ import type { HitCell } from '@tabkit/render';
 import type { Tone } from '@tabkit/playback';
 import { ContextMenu } from './components/ContextMenu';
 import { SheetHeader } from './components/SheetHeader';
-import { SidePanel } from './components/SidePanel';
+import { Toolbar } from './components/Toolbar';
 import { TabSheet } from './components/TabSheet';
 import { useTabKeyboard } from './hooks/useTabKeyboard';
 import { useTabPlayer } from './hooks/useTabPlayer';
@@ -356,6 +356,51 @@ export function App(): JSX.Element {
 
   return (
     <div className="app">
+      <Toolbar
+        state={state}
+        selection={selection}
+        brush={brush}
+        tone={tone}
+        speed={speed}
+        metronome={metronome}
+        isPlaying={player.isPlaying}
+        statusMessage={statusMessage}
+        onTogglePlay={togglePlay}
+        onTempo={(bpm) => {
+          apply(setScoreMeta(stateRef.current, { tempo: bpm }));
+        }}
+        onSpeed={setSpeed}
+        onTone={setTone}
+        onMetronome={setMetronome}
+        onNew={() => {
+          loadScore(createDefaultScore());
+        }}
+        onLoadDemo={() => {
+          loadScore(demoScore());
+        }}
+        onLoadShowcase={() => {
+          loadScore(showcaseScore());
+        }}
+        onLoadNothingElse={() => {
+          loadScore(nothingElseMatters());
+        }}
+        onUndo={() => {
+          apply(undo(stateRef.current));
+          clearSelection();
+        }}
+        onRedo={() => {
+          apply(redo(stateRef.current));
+          clearSelection();
+        }}
+        onExport={onExport}
+        onImport={onImport}
+        onBrush={onBrushPick}
+        onScoreTimeSignature={(ts) => {
+          apply(setScoreTimeSignature(stateRef.current, ts));
+          clearSelection();
+        }}
+        onToggleArticulation={onToggleArticulation}
+      />
       <div className="workspace">
         <div className="sheet-area">
           <div className="tab-sheet">
@@ -421,51 +466,6 @@ export function App(): JSX.Element {
             />
           </div>
         </div>
-        <SidePanel
-          state={state}
-          selection={selection}
-          brush={brush}
-          tone={tone}
-          speed={speed}
-          metronome={metronome}
-          isPlaying={player.isPlaying}
-          statusMessage={statusMessage}
-          onTogglePlay={togglePlay}
-          onTempo={(bpm) => {
-            apply(setScoreMeta(stateRef.current, { tempo: bpm }));
-          }}
-          onSpeed={setSpeed}
-          onTone={setTone}
-          onMetronome={setMetronome}
-          onNew={() => {
-            loadScore(createDefaultScore());
-          }}
-          onLoadDemo={() => {
-            loadScore(demoScore());
-          }}
-          onLoadShowcase={() => {
-            loadScore(showcaseScore());
-          }}
-          onLoadNothingElse={() => {
-            loadScore(nothingElseMatters());
-          }}
-          onUndo={() => {
-            apply(undo(stateRef.current));
-            clearSelection();
-          }}
-          onRedo={() => {
-            apply(redo(stateRef.current));
-            clearSelection();
-          }}
-          onExport={onExport}
-          onImport={onImport}
-          onBrush={onBrushPick}
-          onScoreTimeSignature={(ts) => {
-            apply(setScoreTimeSignature(stateRef.current, ts));
-            clearSelection();
-          }}
-          onToggleArticulation={onToggleArticulation}
-        />
       </div>
       <footer className="statusbar">
         <span>
