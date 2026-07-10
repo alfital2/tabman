@@ -72,9 +72,9 @@ export const ARTICULATION_GROUPS: readonly ArticulationGroup[] = [
 function slideStyleLabel(style: (typeof SLIDE_STYLES)[number]): string {
   switch (style) {
     case 'shift':
-      return 'Shift';
+      return 'Shift (re-pick)';
     case 'legato':
-      return 'Legato';
+      return 'Slide (one pick)';
     case 'inBelow':
       return 'In from below';
     case 'inAbove':

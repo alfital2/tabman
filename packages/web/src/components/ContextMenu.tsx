@@ -43,17 +43,26 @@ export function ContextMenu(props: ContextMenuProps): JSX.Element {
 
   useLayoutEffect(() => {
     const close = (event: Event) => {
-      if (event instanceof KeyboardEvent && event.key !== 'Escape') return;
       if (event instanceof PointerEvent && menuRef.current?.contains(event.target as Node)) return;
       props.onClose();
     };
+    // The menu owns the keyboard while open: swallow every key (capture +
+    // stopPropagation) so global shortcuts don't edit the document behind it,
+    // and Escape closes the menu without falling through to clear the selection.
+    const onKey = (event: KeyboardEvent) => {
+      event.stopPropagation();
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        props.onClose();
+      }
+    };
     window.addEventListener('pointerdown', close, true);
-    window.addEventListener('keydown', close, true);
+    window.addEventListener('keydown', onKey, true);
     window.addEventListener('wheel', close, { capture: true, passive: true });
     window.addEventListener('resize', close);
     return () => {
       window.removeEventListener('pointerdown', close, true);
-      window.removeEventListener('keydown', close, true);
+      window.removeEventListener('keydown', onKey, true);
       window.removeEventListener('wheel', close, true);
       window.removeEventListener('resize', close);
     };

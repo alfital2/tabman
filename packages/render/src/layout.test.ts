@@ -164,22 +164,18 @@ describe('layoutScore', () => {
     expect(layout.primitives.some((p) => p.kind === 'path' && p.role === 'vibrato')).toBe(true);
   });
 
-  it('justifies bars to fill the row and rules staff lines full-width', () => {
+  it('justifies bars toward the row width, but caps slot width and rules staff full-width', () => {
     const layout = layoutScore(createDefaultScore(), undefined, { fillToWidth: 800 });
     // staff lines span the whole row, not just to the last barline
     const staff = layout.primitives.filter((p): p is LinePrimitive => p.kind === 'line' && p.role === 'staff');
     expect(Math.max(...staff.map((l) => l.x2))).toBeCloseTo(800 - 12);
-    // bars stretched: the natural layout is much narrower than the justified one
     const natural = layoutScore(createDefaultScore());
-    const naturalEnd = Math.max(
-      ...natural.primitives.filter((p) => p.kind === 'line' && p.role === 'barline').map((l) => (l as LinePrimitive).x1),
-    );
-    const justifiedEnd = Math.max(
-      ...layout.primitives.filter((p) => p.kind === 'line' && p.role === 'barline').map((l) => (l as LinePrimitive).x1),
-    );
-    expect(justifiedEnd).toBeGreaterThan(naturalEnd * 1.5);
-    // slot boxes widen with the bars
-    expect(layout.slots[0]!.rect.width).toBeGreaterThan(natural.slots[0]!.rect.width * 1.5);
+    // some stretch happens...
+    expect(layout.slots[0]!.rect.width).toBeGreaterThan(natural.slots[0]!.rect.width);
+    // ...but a near-empty bar's slot never balloons to fill the row (the fresh
+    // first-note cursor box was ~188px before the cap).
+    const DEFAULT_BEAT_WIDTH = 28;
+    expect(layout.slots[0]!.rect.width).toBeLessThanOrEqual(DEFAULT_BEAT_WIDTH * 1.6);
   });
 
   it('fills to height with blank ruled systems', () => {

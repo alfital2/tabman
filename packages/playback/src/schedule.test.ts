@@ -144,6 +144,50 @@ describe('scheduleScore', () => {
     expect(source.pitch![source.pitch!.length - 1]!.ratio).toBeCloseTo(2 ** (4 / 12));
   });
 
+  it('play-from the middle of a legato chain re-folds it (no silence, keeps the glide)', () => {
+    const score = scoreOf(
+      createBar(FOUR_FOUR, [
+        createVoice([
+          createBeat(QUARTER, [createNote(0, 5, { articulations: [plainArticulation('hammerOn')] })]),
+          createBeat(QUARTER, [createNote(0, 7, { articulations: [plainArticulation('hammerOn')] })]),
+          createBeat(QUARTER, [createNote(0, 9)]),
+        ]),
+      ]),
+    );
+    // Full playback: the whole chain folds into beat 0.
+    const full = scheduleScore(score, 120);
+    expect(full.events[0]!.notes[0]!.attack).toBe(true);
+    expect(full.events[1]!.notes[0]!.attack).toBe(false);
+    expect(full.events[2]!.notes[0]!.attack).toBe(false);
+
+    // Starting mid-chain at beat 1: it must become a fresh pick that still
+    // slurs into beat 2 — not a stale attack:false that would go silent.
+    const mid = scheduleScore(score, 120, { fromBar: 0, fromBeat: 1 });
+    expect(mid.events).toHaveLength(2);
+    const first = mid.events[0]!.notes[0]!;
+    expect(first.attack).toBe(true); // re-picked
+    expect(mid.events[1]!.notes[0]!.attack).toBe(false); // still slurred
+    expect(first.pitch).toBeDefined(); // carries the step up to fret 9
+    expect(first.sustainSec).toBeCloseTo(1); // rings through both remaining beats
+  });
+
+  it('the default (legato) slide does not re-pick the target', () => {
+    const score = scoreOf(
+      createBar(FOUR_FOUR, [
+        createVoice([
+          createBeat(QUARTER, [createNote(0, 5, { articulations: [slide('legato')] })]),
+          createBeat(QUARTER, [createNote(0, 10)]),
+        ]),
+      ]),
+    );
+    const { events } = scheduleScore(score, 120);
+    expect(events[1]!.notes[0]!.attack).toBe(false); // no second pick at fret 10
+    const anchors = events[0]!.notes[0]!.pitch!;
+    // reaches the target pitch (+5 semitones) via a fret-by-fret staircase
+    expect(anchors[anchors.length - 1]!.ratio).toBeCloseTo(2 ** (5 / 12));
+    expect(anchors.length).toBeGreaterThanOrEqual(10);
+  });
+
   it('a chain broken by a rest or another string leaves the target picked', () => {
     const score = scoreOf(
       createBar(FOUR_FOUR, [

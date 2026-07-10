@@ -72,9 +72,10 @@ export function resolveGesture(input: GestureInput): GestureResult {
     return delta === 0 ? { kind: 'none' } : { kind: 'moveSelection', delta };
   }
 
-  // Horizontal: reposition in time onto the slot under the pointer.
+  // Horizontal: reposition in time onto the slot under the pointer. A drag that
+  // ends on the note's own slot is just a pick, not a silent no-op.
   if (input.endCell.bar === input.startCell.bar && input.endCell.beat === input.startCell.beat) {
-    return { kind: 'none' };
+    return { kind: 'pick', cell: input.startCell };
   }
   return { kind: 'moveToSlot', from: input.startCell, target: input.endCell };
 }

@@ -158,6 +158,39 @@ check('typing past the last bar grows the score', measureNumbers >= 1);
 const statusEnd = await page.locator('.statusbar').textContent();
 check('cursor continued into the new bar', /Bar [56]/.test(statusEnd), statusEnd.trim().slice(0, 40));
 
+// 12b. Fresh-doc cursor box is compact (justification slot cap)
+await page.locator('button', { hasText: /^New$/ }).click();
+await page.waitForTimeout(200);
+const caretW = await page.evaluate(() => document.querySelector('.cursor-caret')?.getBoundingClientRect().width ?? 999);
+check('fresh cursor box is compact (not stretched)', caretW < 75, `${Math.round(caretW)}px`);
+
+// 12c. Slide popover opens fully on-screen (fixed, viewport-clamped)
+await page.locator('button', { hasText: 'Demo riff' }).click();
+await page.waitForTimeout(200);
+await svg.locator('text', { hasText: /^5$/ }).first().click();
+await page.locator('button', { hasText: /^Slide$/ }).click();
+await page.waitForTimeout(150);
+const popOnScreen = await page.evaluate(() => {
+  const p = document.querySelector('.popover');
+  if (!p) return false;
+  const r = p.getBoundingClientRect();
+  return r.right <= window.innerWidth && r.left >= 0 && getComputedStyle(p).position === 'fixed';
+});
+check('slide popover fully on-screen', popOnScreen);
+await page.keyboard.press('Escape');
+await page.waitForTimeout(100);
+check('Escape closes popover', (await page.locator('.popover').count()) === 0);
+
+// 12d. Global shortcuts are swallowed while the context menu is open
+await svg.locator('text', { hasText: /^0$/ }).first().click({ button: 'right' });
+await page.waitForTimeout(150);
+await page.keyboard.press('9');
+await page.waitForTimeout(120);
+check('context menu swallows global shortcut key', (await page.locator('.context-menu').count()) === 1);
+await page.keyboard.press('Escape');
+await page.waitForTimeout(120);
+check('Escape closes the context menu', (await page.locator('.context-menu').count()) === 0);
+
 // 13. Export produces a download
 const [download] = await Promise.all([
   page.waitForEvent('download', { timeout: 5000 }),

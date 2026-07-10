@@ -108,6 +108,23 @@ export function App(): JSX.Element {
     };
   }, [state.score]);
 
+  // Flush the pending save when the tab is hidden or closed, so the last few
+  // edits within the debounce window aren't lost.
+  useEffect(() => {
+    const flush = () => {
+      saveStoredScore(typeof localStorage === 'undefined' ? null : localStorage, stateRef.current.score);
+    };
+    const onVisibility = () => {
+      if (document.visibilityState === 'hidden') flush();
+    };
+    window.addEventListener('pagehide', flush);
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      window.removeEventListener('pagehide', flush);
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
+  }, []);
+
   useEffect(() => {
     if (statusMessage === null) return;
     const timer = setTimeout(() => {
@@ -223,6 +240,7 @@ export function App(): JSX.Element {
     },
     onDuplicate: () => {
       apply(duplicateBar(stateRef.current, stateRef.current.cursor.bar));
+      clearSelection();
     },
   });
 
@@ -299,6 +317,7 @@ export function App(): JSX.Element {
         clipboard={clipboard}
         onDuplicateBar={(index) => {
           apply(duplicateBar(stateRef.current, index));
+          clearSelection();
         }}
         onCopyBar={(index) => {
           const bar = stateRef.current.score.tracks[0]?.bars[index];
@@ -306,12 +325,15 @@ export function App(): JSX.Element {
         }}
         onPasteBar={(index) => {
           if (clipboard?.kind === 'bar') apply(replaceBarValue(stateRef.current, index, clipboard.bar));
+          clearSelection();
         }}
         onInsertBarBefore={(index) => {
           apply(insertBar(stateRef.current, index));
+          clearSelection();
         }}
         onInsertBarAfter={(index) => {
           apply(insertBar(stateRef.current, index + 1));
+          clearSelection();
         }}
         onDeleteBar={(index) => {
           apply(deleteBar(stateRef.current, index));
@@ -368,23 +390,30 @@ export function App(): JSX.Element {
                 }
                 apply(moved);
               }}
-              onMoveToSlot={(cells, target) => {
+              onMoveToSlot={(cells, target, isGroup) => {
                 const next = moveNotesToSlot(stateRef.current, cells, target);
                 if (next !== stateRef.current) {
-                  // Keep the moved notes selected at their new positions.
-                  const sourceOrder = [...new Map(cells.map((c) => [`${String(c.bar)}:${String(c.beat)}`, c])).entries()]
-                    .sort(([, a], [, b]) => a.bar - b.bar || a.beat - b.beat)
-                    .map(([key]) => key);
-                  const indexByBeat = new Map(sourceOrder.map((key, i) => [key, i]));
-                  const remapped = cells.map((c) => ({
-                    bar: target.bar,
-                    beat: target.beat + (indexByBeat.get(`${String(c.bar)}:${String(c.beat)}`) ?? 0),
-                    string: c.string,
-                  }));
-                  setSelection(selectionRef.current.length > 0 ? remapped : []);
+                  if (isGroup) {
+                    // Keep the moved selection selected at its new positions.
+                    const sourceOrder = [...new Map(cells.map((c) => [`${String(c.bar)}:${String(c.beat)}`, c])).entries()]
+                      .sort(([, a], [, b]) => a.bar - b.bar || a.beat - b.beat)
+                      .map(([key]) => key);
+                    const indexByBeat = new Map(sourceOrder.map((key, i) => [key, i]));
+                    setSelection(
+                      cells.map((c) => ({
+                        bar: target.bar,
+                        beat: target.beat + (indexByBeat.get(`${String(c.bar)}:${String(c.beat)}`) ?? 0),
+                        string: c.string,
+                      })),
+                    );
+                  } else {
+                    // A single-note drag doesn't hijack an unrelated selection.
+                    clearSelection();
+                  }
                 }
                 apply(next);
               }}
+              onClearSelection={clearSelection}
               onContextMenu={(x, y, cell) => {
                 apply(placeCursor(stateRef.current, cell));
                 setMenu({ x, y, cell });

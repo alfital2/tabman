@@ -32,8 +32,9 @@ export type Articulation =
 
 export const BEND_AMOUNTS: readonly BendAmount[] = Object.freeze([0.25, 0.5, 0.75, 1, 1.5, 2]);
 export const SLIDE_STYLES: readonly SlideStyle[] = Object.freeze([
-  'shift',
+  // legato first: the everyday slide — one pick, glide, no re-pick at the target.
   'legato',
+  'shift',
   'inBelow',
   'inAbove',
   'outDown',
@@ -103,7 +104,7 @@ export function defaultArticulation(type: ArticulationType): Articulation {
     case 'bend':
       return bend(1);
     case 'slide':
-      return slide('shift');
+      return slide('legato');
     case 'harmonic':
       return harmonic('natural');
     default:

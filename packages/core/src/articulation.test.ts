@@ -26,7 +26,8 @@ describe('articulation', () => {
 
   it('defaultArticulation fills default parameters', () => {
     expect(defaultArticulation('bend')).toEqual({ type: 'bend', amount: 1 });
-    expect(defaultArticulation('slide')).toEqual({ type: 'slide', style: 'shift' });
+    // default slide is legato: one pick, no re-pick at the target (real slide feel)
+    expect(defaultArticulation('slide')).toEqual({ type: 'slide', style: 'legato' });
     expect(defaultArticulation('harmonic')).toEqual({ type: 'harmonic', kind: 'natural' });
     expect(defaultArticulation('palmMute')).toEqual({ type: 'palmMute' });
   });

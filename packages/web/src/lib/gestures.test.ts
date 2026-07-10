@@ -49,10 +49,11 @@ describe('resolveGesture', () => {
     );
     expect(horizontal).toEqual({ kind: 'moveToSlot', from: cell(0, 0, 1), target: cell(1, 0, 1) });
 
+    // a horizontal drag that ends on the note's own slot is a pick, not a no-op
     const samePlace = resolveGesture(
       input({ mode: 'single', startCell: cell(0, 0, 1), endCell: cell(0, 0, 1), end: { x: 8, y: 1 } }),
     );
-    expect(samePlace).toEqual({ kind: 'none' });
+    expect(samePlace).toEqual({ kind: 'pick', cell: cell(0, 0, 1) });
   });
 
   it('single drag back to the same string is a pick', () => {

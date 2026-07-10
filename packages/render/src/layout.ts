@@ -197,16 +197,21 @@ export function layoutScore(score: Score, metrics: Metrics = DEFAULT_METRICS, op
   // Pass 2.5: justify — stretch each system's bars to fill the row width, so
   // a short row (or a lone bar) never renders as a stub. Only meaningful when
   // the width is bounded.
+  // A beat/append slot never stretches past this, so a near-empty bar keeps
+  // compact cells instead of ballooning to fill the row (the staff lines still
+  // rule full width, so the page reads as paper either way).
+  const maxSlotWidth = m.beatWidth * 1.55;
   const placedSystems: PlacedBar[][] = systemsOfBars.map((systemPlans) => {
     const natural = systemPlans.reduce((sum, p) => sum + p.width, 0);
     const usable = Number.isFinite(fillWidth) ? fillWidth - m.marginX - originX : natural;
     const scale = natural > 0 && usable > natural ? Math.min(MAX_JUSTIFY_SCALE, usable / natural) : 1;
     let cursorX = originX;
     return systemPlans.map((plan) => {
-      const width = plan.width * scale;
       const fixed = m.barStartPad + m.barEndPad + (plan.showTimeSignature ? TIME_SIGNATURE_WIDTH : 0);
       const slotCount = Math.max(1, beats(plan.bar).length + (plan.hasAppendSlot ? 1 : 0));
-      const placed: PlacedBar = { ...plan, x: cursorX, width, slotWidth: (width - fixed) / slotCount };
+      const slotWidth = Math.min(maxSlotWidth, (plan.width * scale - fixed) / slotCount);
+      const width = fixed + slotWidth * slotCount;
+      const placed: PlacedBar = { ...plan, x: cursorX, width, slotWidth };
       cursorX += width;
       return placed;
     });

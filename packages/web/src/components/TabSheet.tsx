@@ -35,7 +35,8 @@ export interface TabSheetProps {
   onSelect(cells: Cell[]): void;
   onMoveNote(from: Cell, toString: number): void;
   onMoveSelection(delta: number): void;
-  onMoveToSlot(cells: readonly Cell[], target: HitCell): void;
+  onMoveToSlot(cells: readonly Cell[], target: HitCell, isGroup: boolean): void;
+  onClearSelection(): void;
   onContextMenu(clientX: number, clientY: number, cell: HitCell): void;
 }
 
@@ -188,8 +189,9 @@ export function TabSheet(props: TabSheetProps): JSX.Element {
 
   const onPointerUp = () => {
     if (!drag) return;
+    const finished = drag;
     setDrag(null);
-    const result = resolveGesture(drag);
+    const result = resolveGesture(finished);
     switch (result.kind) {
       case 'pick':
         props.onPick(result.cell);
@@ -204,9 +206,19 @@ export function TabSheet(props: TabSheetProps): JSX.Element {
         props.onMoveSelection(result.delta);
         break;
       case 'moveToSlot':
-        props.onMoveToSlot(drag.mode === 'group' ? selection : [result.from], result.target);
+        props.onMoveToSlot(finished.mode === 'group' ? selection : [result.from], result.target, finished.mode === 'group');
         break;
       case 'none':
+        // A plain click on empty staff space clears the current selection.
+        if (
+          finished.mode === 'marquee' &&
+          !finished.endCell &&
+          !finished.startCell &&
+          Math.abs(finished.end.x - finished.start.x) <= CLICK_SLOP &&
+          Math.abs(finished.end.y - finished.start.y) <= CLICK_SLOP
+        ) {
+          props.onClearSelection();
+        }
         break;
     }
   };
@@ -283,16 +295,20 @@ export function TabSheet(props: TabSheetProps): JSX.Element {
     const dy = Math.abs(drag.end.y - drag.start.y);
     const horizontal = dx > dy;
     if (drag.mode !== 'marquee' && drag.startCell && horizontal) {
-      // Reposition-in-time preview: tint the slot column under the pointer.
+      // Reposition-in-time preview: tint the consecutive slots the notes land
+      // on (a group spreads across one slot per distinct source beat).
       const movingCells = drag.mode === 'group' ? selection : [drag.startCell];
       const notSame = drag.endCell.bar !== drag.startCell.bar || drag.endCell.beat !== drag.startCell.beat;
       if (notSame) {
         const ok = canMoveNotesToSlot(state.score, movingCells, drag.endCell);
-        const rect = slotRect(layout, drag.endCell.bar, drag.endCell.beat);
-        if (rect) {
-          topOverlays.push(
-            <rect key="preview-slot" x={rect.x} y={rect.y} width={rect.width} height={rect.height} fill={ok ? '#16a34a' : '#dc2626'} opacity={0.25} rx={2} />,
-          );
+        const distinctBeats = new Set(movingCells.map((c) => `${String(c.bar)}:${String(c.beat)}`)).size;
+        for (let k = 0; k < Math.max(1, distinctBeats); k++) {
+          const rect = slotRect(layout, drag.endCell.bar, drag.endCell.beat + k);
+          if (rect) {
+            topOverlays.push(
+              <rect key={`preview-slot-${String(k)}`} x={rect.x} y={rect.y} width={rect.width} height={rect.height} fill={ok ? '#16a34a' : '#dc2626'} opacity={0.25} rx={2} />,
+            );
+          }
         }
       }
     } else if (drag.mode === 'single' && drag.startCell && drag.endCell.string !== drag.startCell.string) {

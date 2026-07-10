@@ -83,8 +83,11 @@ function barAdvanceWholes(bar: Bar) {
 }
 
 const BEND_RATIO_PER_TONE = (tones: number) => 2 ** ((tones * 2) / 12);
-/** Fraction of the note's duration before pitch transitions begin. */
+/** Fraction of the note's duration before a bend begins. */
 const TRANSITION_POINT = 0.6;
+/** A slide glide spans this fraction of the source note — wide enough that the
+ * chromatic staircase reads as stepped frets, not a fretless glissando. */
+const SLIDE_SPAN = 0.7;
 const STEP_EPSILON = 0.008;
 
 /**
@@ -103,7 +106,9 @@ function glideAnchors(startSec: number, endSec: number, fromRatio: number, toRat
   const steps = Math.abs(semitones);
   const direction = Math.sign(semitones);
   const slice = (endSec - startSec) / steps;
-  const snap = Math.min(0.012, slice * 0.35);
+  // Hold each fret for most of its slice, then a crisp ~6 ms ramp to the next —
+  // short enough to read as a fretted step, long enough not to click.
+  const snap = Math.min(0.006, slice * 0.25);
   const anchors: PitchAnchor[] = [{ atSec: startSec, ratio: fromRatio }];
   for (let k = 1; k <= steps; k++) {
     const prevRatio = fromRatio * 2 ** ((direction * (k - 1)) / 12);
@@ -179,7 +184,32 @@ export function scheduleScore(score: Score, bpm: number, from?: PlayFrom): Sched
   });
   const totalSec = barStart;
 
-  // Fold legato chains and bake pitch automation.
+  if (!from || (from.fromBar === undefined && from.fromBeat === undefined)) {
+    foldChains(events);
+    return { events, totalSec };
+  }
+
+  // Play-from: slice to the range and rebase to zero, THEN fold — so a chain
+  // that starts mid-cut (e.g. the first kept note was a legato target whose
+  // source was dropped) is re-analysed with that note as a fresh pick, instead
+  // of a stale `attack:false` that would silence the rest of the chain.
+  const fromBar = from.fromBar ?? 0;
+  const fromBeat = from.fromBeat ?? 0;
+  const t0 = beatStartSeconds(score, bpm, fromBar, fromBeat);
+  const rebased = events
+    .filter((e) => e.bar > fromBar || (e.bar === fromBar && e.beat >= fromBeat))
+    .map((e) => ({ ...e, startSec: e.startSec - t0, notes: e.notes.map((note) => ({ ...note })) }));
+  foldChains(rebased);
+  return { events: rebased, totalSec: Math.max(0, totalSec - t0) };
+}
+
+/**
+ * Fold legato chains (hammer-on, pull-off, legato slide) into their source
+ * note and bake each note's pitch automation. Mutates the events in place.
+ * All times are relative to each source's own start, so this is correct
+ * whether the events are absolute or rebased for play-from.
+ */
+function foldChains(events: ScheduledEvent[]): void {
   for (let i = 0; i < events.length; i++) {
     for (const source of events[i]!.notes) {
       if (!source.attack) continue; // already consumed by an earlier chain
@@ -198,7 +228,9 @@ export function scheduleScore(score: Score, bpm: number, from?: PlayFrom): Sched
         if (!nextEvent || !target) break;
         const targetRatio = target.frequency / source.frequency;
         const curDur = events[eventIndex]!.durationSec;
-        const transitionStart = offset - curDur * (1 - TRANSITION_POINT);
+        // Slides glide over most of the source note; the value is only consumed
+        // by the (slide) shift/legato branches below.
+        const transitionStart = offset - curDur * SLIDE_SPAN;
 
         if (transition === 'shift') {
           // Glide to the destination fret-by-fret; the destination is re-picked.
@@ -236,23 +268,6 @@ export function scheduleScore(score: Score, bpm: number, from?: PlayFrom): Sched
       }
     }
   }
-
-  if (!from || (from.fromBar === undefined && from.fromBeat === undefined)) {
-    return { events, totalSec };
-  }
-
-  const fromBar = from.fromBar ?? 0;
-  const fromBeat = from.fromBeat ?? 0;
-  const t0 = beatStartSeconds(score, bpm, fromBar, fromBeat);
-  const kept = events.filter((e) => e.bar > fromBar || (e.bar === fromBar && e.beat >= fromBeat));
-  const rebased = kept.map((e, idx) => ({
-    ...e,
-    startSec: e.startSec - t0,
-    // The first sounding event must be picked even if it was a legato target —
-    // its source got dropped by the range cut.
-    notes: idx === 0 ? e.notes.map((note) => ({ ...note, attack: true })) : e.notes,
-  }));
-  return { events: rebased, totalSec: Math.max(0, totalSec - t0) };
 }
 
 /** Absolute start time of a cell (bar, beat) on the schedule timeline. */

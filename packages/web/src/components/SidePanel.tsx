@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { JSX } from 'react';
 import {
   articulationsEqual,
+  clampTempo,
   defaultArticulation,
   getArticulation,
   hasArticulation,
@@ -53,7 +54,9 @@ export interface SidePanelProps {
 export function SidePanel(props: SidePanelProps): JSX.Element {
   const { state, selection, brush } = props;
   const [tempoText, setTempoText] = useState(String(state.score.tempo));
-  const [openPopover, setOpenPopover] = useState<ArticulationType | null>(null);
+  // The popover is positioned fixed (viewport coords) so it escapes the
+  // scrolling panel's overflow clip instead of being cut off at the edge.
+  const [openPopover, setOpenPopover] = useState<{ type: ArticulationType; x: number; y: number } | null>(null);
   const articulationsRef = useRef<HTMLDivElement | null>(null);
   const fileRef = useRef<HTMLInputElement | null>(null);
 
@@ -63,20 +66,51 @@ export function SidePanel(props: SidePanelProps): JSX.Element {
 
   useEffect(() => {
     if (openPopover === null) return;
-    const close = (event: PointerEvent) => {
-      if (articulationsRef.current?.contains(event.target as Node)) return;
+    const close = (event: Event) => {
+      if (event instanceof PointerEvent && articulationsRef.current?.contains(event.target as Node)) return;
       setOpenPopover(null);
     };
+    // The popover owns the keyboard while open: swallow keys so global
+    // shortcuts don't fire behind it, and Escape closes it.
+    const onKey = (event: KeyboardEvent) => {
+      event.stopPropagation();
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        setOpenPopover(null);
+      }
+    };
     window.addEventListener('pointerdown', close, true);
+    window.addEventListener('keydown', onKey, true);
+    // A fixed popover detaches from its button, so any scroll must dismiss it.
+    window.addEventListener('scroll', close, true);
+    window.addEventListener('resize', close);
     return () => {
       window.removeEventListener('pointerdown', close, true);
+      window.removeEventListener('keydown', onKey, true);
+      window.removeEventListener('scroll', close, true);
+      window.removeEventListener('resize', close);
     };
   }, [openPopover]);
+
+  const POPOVER_WIDTH = 208;
+  const togglePopover = (type: ArticulationType, anchor: HTMLElement, variantCount: number) => {
+    setOpenPopover((cur) => {
+      if (cur?.type === type) return null;
+      const r = anchor.getBoundingClientRect();
+      const estHeight = variantCount * 34 + 12;
+      const x = Math.max(8, Math.min(r.left, window.innerWidth - POPOVER_WIDTH - 8));
+      const y = Math.min(r.bottom + 4, window.innerHeight - estHeight - 8);
+      return { type, x: Math.round(x), y: Math.round(Math.max(8, y)) };
+    });
+  };
 
   const commitTempo = () => {
     const parsed = Number(tempoText);
     if (Number.isFinite(parsed) && parsed > 0) {
       props.onTempo(parsed);
+      // Resync the field to the clamped value even when it lands on the current
+      // tempo (no score change → the score-driven effect wouldn't fire).
+      setTempoText(String(clampTempo(parsed)));
     } else {
       setTempoText(String(state.score.tempo));
     }
@@ -277,9 +311,9 @@ export function SidePanel(props: SidePanelProps): JSX.Element {
                     type="button"
                     className={`chip${typeActive(button.type) ? ' active' : ''}`}
                     disabled={targetNotes.length === 0}
-                    onClick={() => {
+                    onClick={(e) => {
                       if (button.variants) {
-                        setOpenPopover((open) => (open === button.type ? null : button.type));
+                        togglePopover(button.type, e.currentTarget, button.variants.length);
                       } else {
                         props.onToggleArticulation(defaultArticulation(button.type));
                       }
@@ -287,8 +321,8 @@ export function SidePanel(props: SidePanelProps): JSX.Element {
                   >
                     {button.label}
                   </button>
-                  {button.variants && openPopover === button.type && (
-                    <div className="popover">
+                  {button.variants && openPopover?.type === button.type && (
+                    <div className="popover" style={{ left: openPopover.x, top: openPopover.y, width: POPOVER_WIDTH }}>
                       {button.variants.map((variant) => (
                         <button
                           key={variant.label}

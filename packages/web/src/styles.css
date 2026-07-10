@@ -22,6 +22,37 @@ body {
   height: 100vh;
 }
 
+/* Dark, thin scrollbars — the default light UA scrollbar rendered as a bright
+   strip over the white paper / dark chrome. */
+.sheet-area,
+.side-panel,
+.popover {
+  scrollbar-width: thin;
+  scrollbar-color: #4a4f5a transparent;
+}
+
+.sheet-area::-webkit-scrollbar,
+.side-panel::-webkit-scrollbar,
+.popover::-webkit-scrollbar {
+  width: 9px;
+  height: 9px;
+}
+
+.sheet-area::-webkit-scrollbar-thumb,
+.side-panel::-webkit-scrollbar-thumb,
+.popover::-webkit-scrollbar-thumb {
+  background: #4a4f5a;
+  border-radius: 5px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+.sheet-area::-webkit-scrollbar-track,
+.side-panel::-webkit-scrollbar-track,
+.popover::-webkit-scrollbar-track {
+  background: transparent;
+}
+
 .workspace {
   display: flex;
   flex: 1;
@@ -287,11 +318,11 @@ body {
   position: relative;
 }
 
+/* Fixed (viewport-positioned) so it escapes the scrolling panel's overflow
+   clip; coordinates are computed and clamped in SidePanel. */
 .popover {
-  position: absolute;
-  z-index: 30;
-  top: calc(100% + 4px);
-  left: 0;
+  position: fixed;
+  z-index: 60;
   background: #23252b;
   border: 1px solid #3f4450;
   border-radius: 6px;
@@ -299,8 +330,14 @@ body {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  min-width: 130px;
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45);
+  max-height: 70vh;
+  overflow-y: auto;
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.5);
+}
+
+.popover .chip {
+  flex: none;
+  text-align: left;
 }
 
 .hint {
