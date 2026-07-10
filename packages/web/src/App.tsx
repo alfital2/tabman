@@ -30,6 +30,7 @@ import {
   replaceBarValue,
   setBarTimeSignature,
   setBeatsDuration,
+  setChordAtCursor,
   setDurationAtCursor,
   setFretAtCursor,
   setScoreMeta,
@@ -53,6 +54,7 @@ import type { HitCell } from '@tabkit/render';
 import type { Tone } from '@tabkit/playback';
 import { ContextMenu } from './components/ContextMenu';
 import { SheetHeader } from './components/SheetHeader';
+import { ChordPicker } from './components/ChordPicker';
 import { MenuBar } from './components/MenuBar';
 import { ShortcutsDialog } from './components/ShortcutsDialog';
 import { ToolPanel } from './components/ToolPanel';
@@ -123,6 +125,7 @@ export function App(): JSX.Element {
   const [menu, setMenu] = useState<MenuState | null>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [showShortcuts, setShowShortcuts] = useState<boolean>(shortcutsInitiallyOpen);
+  const [chordPickerCell, setChordPickerCell] = useState<HitCell | null>(null);
 
   const closeShortcuts = useCallback((dontShowAgain: boolean) => {
     setShowShortcuts(false);
@@ -420,6 +423,10 @@ export function App(): JSX.Element {
         onSetBarTimeSignature={(index, ts: TimeSignature) => {
           apply(setBarTimeSignature(stateRef.current, index, ts));
         }}
+        onAddChord={(cell) => {
+          setMenu(null);
+          setChordPickerCell(cell);
+        }}
         onClose={() => {
           setMenu(null);
         }}
@@ -550,6 +557,20 @@ export function App(): JSX.Element {
       </footer>
       {menuNode}
       {showShortcuts && <ShortcutsDialog onClose={closeShortcuts} />}
+      {chordPickerCell && (
+        <ChordPicker
+          onPick={(frets) => {
+            const at = chordPickerCell;
+            const positioned = placeCursor(stateRef.current, { bar: at.bar, beat: at.beat, string: at.string });
+            apply(setChordAtCursor(positioned, frets, brushRef.current));
+            clearSelection();
+            setChordPickerCell(null);
+          }}
+          onClose={() => {
+            setChordPickerCell(null);
+          }}
+        />
+      )}
     </div>
   );
 }

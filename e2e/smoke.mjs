@@ -93,7 +93,7 @@ check('bend 1½ applies (one-click, no popover)', (await svg.locator('text', { h
 await twelve.click({ button: 'right' });
 await page.waitForTimeout(150);
 check('context menu opens', (await page.locator('.context-menu').count()) === 1);
-const dupLabel = await page.locator('.menu-item').first().textContent();
+const dupLabel = await page.locator('.menu-item', { hasText: 'Duplicate bar' }).first().textContent();
 check('menu targets bar 1', dupLabel.includes('bar 1'), dupLabel);
 await page.locator('.menu-item', { hasText: 'Duplicate bar 1' }).click();
 await page.waitForTimeout(150);
@@ -228,6 +228,31 @@ await page.locator('.tb-icon[title="Keyboard shortcuts"]').click();
 await page.waitForTimeout(100);
 check('help button reopens the dialog', (await page.locator('.sc-dialog').count()) === 1);
 await page.locator('.sc-ok').click();
+
+// 15. Add-chord via right-click: search + pick a voicing inserts a chord
+await page.evaluate(() => window.__tabkit.loadNew());
+await page.waitForTimeout(150);
+await page.locator('body').click({ position: { x: 10, y: 10 } });
+await page.keyboard.press('5');
+await page.waitForTimeout(100);
+await svg.locator('text', { hasText: /^5$/ }).first().click({ button: 'right' });
+await page.waitForTimeout(150);
+check('context menu has Add chord', (await page.locator('.menu-item', { hasText: 'Add chord' }).count()) === 1);
+check('note-duration row uses SVG icons', (await page.locator('.menu-chip.glyph svg').count()) === 5);
+await page.locator('.menu-item', { hasText: 'Add chord' }).click();
+await page.waitForTimeout(150);
+check('chord picker opens', (await page.locator('.cp-dialog').count()) === 1);
+await page.locator('.cp-search').fill('Am7');
+await page.waitForTimeout(120);
+await page.locator('.cp-name', { hasText: 'Am7' }).first().click();
+await page.waitForTimeout(120);
+check('chord shows voicing diagrams', (await page.locator('.cp-voicing svg circle').count()) > 0);
+await page.locator('.cp-voicing').first().click();
+await page.waitForTimeout(700);
+check('picker closes after picking a voicing', (await page.locator('.cp-dialog').count()) === 0);
+const chordDoc = await page.evaluate(() => JSON.parse(localStorage.getItem('tabkit.current-document.v0') || 'null'));
+const chordNotes = chordDoc?.tracks?.[0]?.bars?.[0]?.voices?.[0]?.beats?.[0]?.notes?.length ?? 0;
+check('chord inserted as multiple notes', chordNotes >= 3, `${chordNotes} notes`);
 
 check('no console/page errors', errors.length === 0, errors.slice(0, 3).join(' | '));
 

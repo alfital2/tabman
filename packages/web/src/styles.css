@@ -794,6 +794,136 @@ body {
   filter: brightness(1.08);
 }
 
+/* ---- chord picker ---- */
+
+.cp-dialog {
+  width: min(780px, 100%);
+  max-height: 86vh;
+  display: flex;
+  flex-direction: column;
+  background: #262a32;
+  border: 1px solid #3d4250;
+  border-radius: 12px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.55);
+  padding: 18px 20px;
+}
+
+.cp-body {
+  display: flex;
+  gap: 18px;
+  min-height: 0;
+  margin-top: 12px;
+}
+
+.cp-left {
+  width: 216px;
+  flex: 0 0 216px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 0;
+}
+
+.cp-search {
+  padding: 9px 11px;
+  border-radius: 8px;
+  border: 1px solid #3f4450;
+  background: #1f2229;
+  color: #e7e9ee;
+  font-size: 14px;
+  outline: none;
+}
+
+.cp-search:focus {
+  border-color: #2f6bff;
+}
+
+.cp-names {
+  overflow-y: auto;
+  max-height: 48vh;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-right: 2px;
+}
+
+.cp-name {
+  text-align: left;
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: none;
+  background: none;
+  color: #cdd1da;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.cp-name:hover {
+  background: #333945;
+  color: #fff;
+}
+
+.cp-name.active {
+  background: #2f6bff;
+  color: #fff;
+}
+
+.cp-right {
+  flex: 1;
+  min-width: 0;
+  overflow-y: auto;
+  max-height: 54vh;
+}
+
+.cp-chord-title {
+  font-size: 17px;
+  font-weight: 600;
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.cp-count {
+  font-size: 11px;
+  color: #8a909c;
+  font-weight: 400;
+}
+
+.cp-voicings {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.cp-voicing {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid #3a3f4a;
+  background: #2e333c;
+  cursor: pointer;
+}
+
+.cp-voicing:hover {
+  border-color: #2f6bff;
+  background: #333a47;
+}
+
+.cp-voicing-label {
+  font-size: 10.5px;
+  color: #9aa0ac;
+}
+
+.cp-empty {
+  color: #8a909c;
+  font-size: 13px;
+  padding: 12px 2px;
+}
+
 /* ---- context menu ---- */
 
 .context-menu {
@@ -860,6 +990,18 @@ body {
   background: #2f6bff;
   border-color: #2f6bff;
   color: #ffffff;
+}
+
+.menu-chip.glyph {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 5px 0;
+  color: #d7dae1;
+}
+
+.menu-chip.glyph svg {
+  display: block;
 }
 
 /* ---- responsive: menu bar wraps; tool panel drops below the page ---- */

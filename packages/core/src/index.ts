@@ -3,5 +3,6 @@ export * from './duration';
 export * from './timeSignature';
 export * from './pitch';
 export * from './articulation';
+export * from './chords';
 export * from './model';
 export * from './editor';

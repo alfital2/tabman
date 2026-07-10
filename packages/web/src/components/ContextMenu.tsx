@@ -2,9 +2,10 @@ import { useLayoutEffect, useRef, useState } from 'react';
 import type { JSX } from 'react';
 import { beatAt, isRest, type Duration, type EditorState, type TimeSignature } from '@tabkit/core';
 import type { HitCell } from '@tabkit/render';
-import { BRUSH_LADDER, brushGlyph, brushLabel } from '../lib/durationBrush';
+import { BRUSH_LADDER, brushLabel } from '../lib/durationBrush';
 import { BAR_TIME_SIGNATURE_PRESETS, timeSignatureLabel } from '../lib/timeSignatures';
 import type { ClipboardContent } from '../lib/clipboard';
+import { NoteValueIcon } from './icons';
 
 export interface ContextMenuProps {
   x: number;
@@ -20,6 +21,7 @@ export interface ContextMenuProps {
   onDeleteBar(index: number): void;
   onSetDuration(cell: HitCell, duration: Duration): void;
   onSetBarTimeSignature(index: number, ts: TimeSignature): void;
+  onAddChord(cell: HitCell): void;
   onClose(): void;
 }
 
@@ -88,6 +90,10 @@ export function ContextMenu(props: ContextMenuProps): JSX.Element {
 
   return (
     <div className="context-menu" ref={menuRef} style={{ left: position.left, top: position.top }} role="menu">
+      {item('♪ Add chord…', () => {
+        props.onAddChord(cell);
+      })}
+      <div className="menu-separator" />
       {item(`Duplicate bar ${String(barNumber)}`, () => {
         props.onDuplicateBar(cell.bar);
       })}
@@ -117,14 +123,14 @@ export function ContextMenu(props: ContextMenuProps): JSX.Element {
               <button
                 key={duration.value}
                 type="button"
-                className="menu-chip"
+                className="menu-chip glyph"
                 title={brushLabel(duration)}
                 onClick={() => {
                   props.onSetDuration(cell, duration);
                   props.onClose();
                 }}
               >
-                {brushGlyph(duration)}
+                <NoteValueIcon value={duration.value} size={18} />
               </button>
             ))}
           </div>

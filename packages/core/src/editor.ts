@@ -189,6 +189,54 @@ function barHasRoom(bar: Bar, addedWholes: Fraction): boolean {
   return compareFractions(after, barCapacityInWholes(bar.timeSignature)) <= 0;
 }
 
+/**
+ * Write a whole chord voicing at the cursor: one note per non-null string,
+ * replacing whatever the beat held. Uses the cursor beat if present, else
+ * appends a new beat at the brush duration (auto-flowing into the next bar).
+ */
+export function setChordAtCursor(state: EditorState, frets: readonly (number | null)[], brush: Duration = QUARTER): EditorState {
+  const cursor = clampCursor(state.score, state.cursor);
+  const stringCount = track0(state.score).tuning.length;
+  const notes: Note[] = [];
+  frets.forEach((fret, string) => {
+    if (fret === null || string >= stringCount) return;
+    notes.push(createNote(string, clampInt(fret, 0, MAX_FRET)));
+  });
+  if (notes.length === 0) return state;
+
+  const bars = track0(state.score).bars;
+  const bar = bars[cursor.bar]!;
+  const beats = voiceBeats(bar);
+  const existing = beats[cursor.beat];
+
+  if (existing) {
+    const newBeat = createBeat(existing.duration, notes);
+    const newBars = bars.map((b, i) =>
+      i === cursor.bar ? withVoiceBeats(b, beats.map((bt, j) => (j === cursor.beat ? newBeat : bt))) : b,
+    );
+    return commit(state, withBars(state.score, newBars), cursor);
+  }
+
+  const wholes = durationToWholes(brush);
+  const newBeat = createBeat(brush, notes);
+  const newBars = [...bars];
+  let target = cursor.bar;
+  for (;;) {
+    const candidate = newBars[target];
+    if (candidate === undefined) {
+      const ts = newBars[newBars.length - 1]?.timeSignature ?? FOUR_FOUR;
+      newBars.push(createBar(ts));
+      continue;
+    }
+    if (barHasRoom(candidate, wholes) || voiceBeats(candidate).length === 0) break;
+    target += 1;
+  }
+  const targetBar = newBars[target]!;
+  const targetBeatIndex = voiceBeats(targetBar).length;
+  newBars[target] = withVoiceBeats(targetBar, [...voiceBeats(targetBar), newBeat]);
+  return commit(state, withBars(state.score, newBars), { bar: target, beat: targetBeatIndex, string: cursor.string });
+}
+
 export function setDurationAtCursor(state: EditorState, duration: Duration): EditorState {
   const cursor = clampCursor(state.score, state.cursor);
   return setBeatsDuration(state, [cursor], duration);

@@ -24,6 +24,7 @@ import {
   placeCursor,
   redo,
   setBarTimeSignature,
+  setChordAtCursor,
   setFretAtCursor,
   setDurationAtCursor,
   setScoreMeta,
@@ -384,6 +385,35 @@ describe('moveNotesToSlot (drag in time)', () => {
     expect(canMoveNotesToSlot(state.score, [{ bar: 0, beat: 0, string: 0 }], { bar: 0, beat: 0 })).toBe(false);
     expect(canMoveNotesToSlot(state.score, [{ bar: 0, beat: 0, string: 0 }], { bar: 1, beat: 0 })).toBe(true);
     expect(moveNotesToSlot(state, [{ bar: 0, beat: 0, string: 0 }], { bar: 0, beat: 1 })).toBe(state);
+  });
+});
+
+describe('setChordAtCursor', () => {
+  it('writes a whole voicing as notes at the cursor beat', () => {
+    // open C in our string order: [e0, B1, G0, D2, A3, low-E muted]
+    const state = setChordAtCursor(emptyEditor(), [0, 1, 0, 2, 3, null], QUARTER);
+    const beat = beatAt(state.score, 0, 0)!;
+    expect(beat.notes.map((n) => [n.string, n.fret])).toEqual([
+      [0, 0],
+      [1, 1],
+      [2, 0],
+      [3, 2],
+      [4, 3],
+    ]);
+    expect(state.canUndo).toBe(true);
+  });
+
+  it('replaces whatever the beat held', () => {
+    let state = setFretAtCursor(emptyEditor(), 9); // string0 fret9
+    state = setChordAtCursor(state, [0, 1, 0, 2, 3, null]);
+    const beat = beatAt(state.score, 0, 0)!;
+    expect(beat.notes.find((n) => n.string === 0)!.fret).toBe(0); // replaced, not 9
+    expect(beat.notes).toHaveLength(5);
+  });
+
+  it('ignores an all-muted voicing', () => {
+    const state = emptyEditor();
+    expect(setChordAtCursor(state, [null, null, null, null, null, null])).toBe(state);
   });
 });
 
