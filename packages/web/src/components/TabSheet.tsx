@@ -34,8 +34,12 @@ export interface TabSheetProps {
   playhead: PlayheadPosition | null;
   /** When set, a type-to-add chord box floats above this column. */
   chordCell: HitCell | null;
+  /** Prefill for the chord box (the current name, when retyping). */
+  chordInitial: string;
   onChordCommit(frets: readonly (number | null)[]): void;
   onChordCancel(): void;
+  /** Clicking an existing chord label reopens the box to retype it. */
+  onEditChord(cell: HitCell, currentName: string): void;
   onPick(cell: HitCell): void;
   onSelect(cells: Cell[]): void;
   onMoveNote(from: Cell, toString: number): void;
@@ -73,6 +77,7 @@ function primitiveNode(p: Primitive, index: number): JSX.Element {
           fontSize={p.fontSize}
           textAnchor={p.anchor}
           dominantBaseline={p.baseline === 'middle' ? 'central' : p.baseline}
+          className={p.role === 'chordName' ? 'chord-label' : undefined}
         >
           {p.text}
         </text>
@@ -171,10 +176,21 @@ export function TabSheet(props: TabSheetProps): JSX.Element {
 
   const selectionKeys = useMemo(() => new Set(selection.map(cellKey)), [selection]);
 
+  const chordLabelAt = (x: number, y: number) =>
+    layout.chordLabels.find(
+      (l) => x >= l.rect.x && x <= l.rect.x + l.rect.width && y >= l.rect.y && y <= l.rect.y + l.rect.height,
+    ) ?? null;
+
   const onPointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
     if (event.button !== 0) return;
     event.preventDefault(); // no native text-selection from the sheet
     const point = toLayoutPoint(event);
+    // A click on a chord name reopens the box to retype that chord.
+    const label = chordLabelAt(point.x, point.y);
+    if (label) {
+      props.onEditChord({ bar: label.path.bar, beat: label.path.beat, string: 0 }, label.text);
+      return;
+    }
     const cell = hitTest(layout, point.x, point.y);
     const mode: GestureMode =
       cell && selectionKeys.has(cellKey(cell))
@@ -415,7 +431,12 @@ export function TabSheet(props: TabSheetProps): JSX.Element {
             className="chord-input-anchor"
             style={{ left: (chordBox.x + chordBox.width / 2) * SCALE, top: chordBox.y * SCALE }}
           >
-            <ChordInput onCommit={props.onChordCommit} onCancel={props.onChordCancel} />
+            <ChordInput
+              key={`${String(props.chordCell.bar)}:${String(props.chordCell.beat)}`}
+              initial={props.chordInitial}
+              onCommit={props.onChordCommit}
+              onCancel={props.onChordCancel}
+            />
           </div>
         )}
       </div>

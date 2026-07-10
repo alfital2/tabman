@@ -254,6 +254,18 @@ const chordDoc = await page.evaluate(() => JSON.parse(localStorage.getItem('tabk
 const chordNotes = chordDoc?.tracks?.[0]?.bars?.[0]?.voices?.[0]?.beats?.[0]?.notes?.length ?? 0;
 check('chord inserted as multiple notes', chordNotes >= 3, `${chordNotes} notes`);
 
+// 16. Click the chord label to retype the chord
+await svg.locator('text', { hasText: /^Am7$/ }).first().click();
+await page.waitForTimeout(150);
+check('clicking chord label reopens the box', (await page.locator('.chord-input-field').count()) === 1);
+check('box prefilled with current chord', (await page.locator('.chord-input-field').inputValue()) === 'Am7');
+await page.locator('.chord-input-field').fill('C');
+await page.waitForTimeout(120);
+await page.keyboard.press('Enter');
+await page.waitForTimeout(500);
+check('retyped chord label updates to C', (await svg.locator('text', { hasText: /^C$/ }).count()) >= 1);
+check('old chord label removed', (await svg.locator('text', { hasText: /^Am7$/ }).count()) === 0);
+
 check('no console/page errors', errors.length === 0, errors.slice(0, 3).join(' | '));
 
 await browser.close();

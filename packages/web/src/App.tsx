@@ -124,7 +124,7 @@ export function App(): JSX.Element {
   const [menu, setMenu] = useState<MenuState | null>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [showShortcuts, setShowShortcuts] = useState<boolean>(shortcutsInitiallyOpen);
-  const [chordPickerCell, setChordPickerCell] = useState<HitCell | null>(null);
+  const [chordEdit, setChordEdit] = useState<{ cell: HitCell; initial: string } | null>(null);
 
   const closeShortcuts = useCallback((dontShowAgain: boolean) => {
     setShowShortcuts(false);
@@ -424,7 +424,7 @@ export function App(): JSX.Element {
         }}
         onAddChord={(cell) => {
           setMenu(null);
-          setChordPickerCell(cell);
+          setChordEdit({ cell, initial: '' });
         }}
         onClose={() => {
           setMenu(null);
@@ -479,17 +479,21 @@ export function App(): JSX.Element {
               state={state}
               selection={selection}
               playhead={player.playhead}
-              chordCell={chordPickerCell}
+              chordCell={chordEdit?.cell ?? null}
+              chordInitial={chordEdit?.initial ?? ''}
               onChordCommit={(frets) => {
-                const at = chordPickerCell;
+                const at = chordEdit?.cell;
                 if (!at) return;
                 const positioned = placeCursor(stateRef.current, { bar: at.bar, beat: at.beat, string: at.string });
                 apply(setChordAtCursor(positioned, frets, brushRef.current));
                 clearSelection();
-                setChordPickerCell(null);
+                setChordEdit(null);
               }}
               onChordCancel={() => {
-                setChordPickerCell(null);
+                setChordEdit(null);
+              }}
+              onEditChord={(cell, currentName) => {
+                setChordEdit({ cell, initial: currentName });
               }}
               onPick={(cell) => {
                 typedRef.current = null;

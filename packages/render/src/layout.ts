@@ -20,7 +20,7 @@ import {
   TIME_SIGNATURE_WIDTH,
   type Metrics,
 } from './metrics';
-import type { BeatBox, Primitive, TrackSystem } from './primitives';
+import type { BeatBox, ChordLabelBox, Primitive, TrackSystem } from './primitives';
 
 export interface LayoutOptions {
   /** Wrap bars onto new systems to fit this width. Infinity/0/undefined = never wrap. */
@@ -37,6 +37,8 @@ export interface Layout {
   readonly beats: readonly BeatBox[];
   /** Every cursor landing spot: each beat, plus the append slot of unfilled bars. */
   readonly slots: readonly BeatBox[];
+  /** Clickable chord-name labels above chord columns. */
+  readonly chordLabels: readonly ChordLabelBox[];
   readonly systems: readonly TrackSystem[];
   readonly stringGap: number;
 }
@@ -221,6 +223,7 @@ export function layoutScore(score: Score, metrics: Metrics = DEFAULT_METRICS, op
   const primitives: Primitive[] = [];
   const beatBoxes: BeatBox[] = [];
   const slotBoxes: BeatBox[] = [];
+  const chordLabels: ChordLabelBox[] = [];
   const systems: TrackSystem[] = [];
   const notePlacements: NotePlacement[] = [];
   /** bar:beat:string -> placement, for two-beat ornaments (slides). */
@@ -378,15 +381,23 @@ export function layoutScore(score: Score, metrics: Metrics = DEFAULT_METRICS, op
         // Chord name above the column — derived live from the notes it sounds.
         const chord = track ? recognizeChord(beat.notes, track.tuning) : null;
         if (chord !== null) {
+          const labelSize = m.fretFontSize * 1.15;
+          const labelY = top - m.staffLineGap * 0.9;
           primitives.push({
             kind: 'text',
             role: 'chordName',
             x: cx,
-            y: top - m.staffLineGap * 0.85,
+            y: labelY,
             text: chord,
-            fontSize: m.fretFontSize,
+            fontSize: labelSize,
             anchor: 'middle',
             baseline: 'auto',
+          });
+          const labelW = Math.max(14, chord.length * labelSize * 0.6 + 8);
+          chordLabels.push({
+            path: { track: TRACK, bar: barIndex, voice: VOICE, beat: beatIndex },
+            rect: { x: cx - labelW / 2, y: labelY - labelSize, width: labelW, height: labelSize + 6 },
+            text: chord,
           });
         }
 
@@ -497,6 +508,7 @@ export function layoutScore(score: Score, metrics: Metrics = DEFAULT_METRICS, op
     primitives,
     beats: beatBoxes,
     slots: slotBoxes,
+    chordLabels,
     systems,
     stringGap: m.staffLineGap,
   };

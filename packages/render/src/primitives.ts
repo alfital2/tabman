@@ -70,6 +70,13 @@ export interface BeatBox {
   readonly rect: Rect;
 }
 
+/** A clickable chord-name label above a beat column (for retyping the chord). */
+export interface ChordLabelBox {
+  readonly path: BeatPath;
+  readonly rect: Rect;
+  readonly text: string;
+}
+
 export interface TrackSystem {
   readonly track: number;
   readonly top: number;

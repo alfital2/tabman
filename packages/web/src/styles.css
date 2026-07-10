@@ -105,6 +105,11 @@ body {
   position: relative;
 }
 
+/* Chord-name labels invite a click to retype the chord. */
+.chord-label {
+  cursor: pointer;
+}
+
 /* Type-to-add chord box, floated centered just above its column. */
 .chord-input-anchor {
   position: absolute;

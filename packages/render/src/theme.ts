@@ -17,6 +17,7 @@ export interface Theme {
   readonly dot: string;
   readonly monoFontFamily: string;
   readonly serifFontFamily: string;
+  readonly chordNameFontFamily: string;
 }
 
 export const DEFAULT_THEME: Theme = Object.freeze({
@@ -36,6 +37,8 @@ export const DEFAULT_THEME: Theme = Object.freeze({
   dot: '#464b56',
   monoFontFamily: "'SF Mono', 'Menlo', 'Consolas', monospace",
   serifFontFamily: "'Georgia', 'Times New Roman', serif",
+  // Elegant humanist letterforms for chord symbols, with graceful fallbacks.
+  chordNameFontFamily: "'Optima', 'Iowan Old Style', 'Palatino Linotype', 'Palatino', 'Segoe UI', sans-serif",
 });
 
 export interface LineStyle {
@@ -78,7 +81,7 @@ export function textStyle(theme: Theme, role: TextRole): TextStyle {
     case 'measureNumber':
       return { fill: theme.measureNumber, fontFamily: theme.monoFontFamily, fontWeight: 'normal' };
     case 'chordName':
-      return { fill: theme.chordName, fontFamily: theme.serifFontFamily, fontWeight: 'bold' };
+      return { fill: theme.chordName, fontFamily: theme.chordNameFontFamily, fontWeight: 'bold' };
     case 'clef':
       return { fill: theme.clef, fontFamily: theme.serifFontFamily, fontWeight: 'bold' };
     case 'timeSignature':

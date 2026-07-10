@@ -3,6 +3,8 @@ import type { JSX, KeyboardEvent as ReactKeyboardEvent } from 'react';
 import { getChord, searchChords } from '@tabkit/core';
 
 export interface ChordInputProps {
+  /** Prefill (e.g. the current chord name when retyping); selected on open. */
+  initial?: string;
   onCommit(frets: readonly (number | null)[]): void;
   onCancel(): void;
 }
@@ -15,7 +17,7 @@ const MAX_SUGGESTIONS = 7;
  * Enter or click inserts the top voicing; Escape or blur cancels.
  */
 export function ChordInput(props: ChordInputProps): JSX.Element {
-  const [query, setQuery] = useState('');
+  const [query, setQuery] = useState(props.initial ?? '');
   const [active, setActive] = useState(0);
   const inputRef = useRef<HTMLInputElement | null>(null);
 
@@ -23,7 +25,10 @@ export function ChordInput(props: ChordInputProps): JSX.Element {
   const activeIdx = results.length === 0 ? -1 : Math.min(active, results.length - 1);
 
   useEffect(() => {
-    inputRef.current?.focus();
+    const el = inputRef.current;
+    if (!el) return;
+    el.focus();
+    el.select(); // typing over a prefilled name replaces it
   }, []);
 
   const commit = (name: string | undefined) => {
