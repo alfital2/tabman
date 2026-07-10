@@ -74,7 +74,7 @@ check('cmd+shift+z redoes', (await svg.locator('text', { hasText: /^9$/ }).count
 // 6. Articulation via panel: select note first (click the "12" fret)
 const twelve = svg.locator('text', { hasText: /^12$/ }).first();
 await twelve.click();
-const palmMute = page.locator('.tb-icon[title="Palm mute"]');
+const palmMute = page.locator('.tp-artbtn[title="Palm mute"]');
 await palmMute.click();
 await page.waitForTimeout(100);
 check('palm mute label renders', (await svg.locator('text', { hasText: /PM/ }).count()) >= 1);
@@ -85,10 +85,9 @@ await page.waitForTimeout(100);
 check('palm mute toggles off', (await svg.locator('text', { hasText: /PM/ }).count()) === 0);
 
 // bend popover with variant
-await page.locator('.tb-icon[title^="Bend"]').click();
-await page.locator('.tb-popover button', { hasText: '1½' }).click();
+await page.locator('.tp-artbtn[title="1½"]').click();
 await page.waitForTimeout(100);
-check('bend 1½ ornament renders', (await svg.locator('text', { hasText: /^1½$/ }).count()) >= 1);
+check('bend 1½ applies (one-click, no popover)', (await svg.locator('text', { hasText: /^1½$/ }).count()) >= 1);
 
 // 7. Context menu
 await twelve.click({ button: 'right' });
@@ -164,22 +163,13 @@ await page.waitForTimeout(200);
 const caretW = await page.evaluate(() => document.querySelector('.cursor-caret')?.getBoundingClientRect().width ?? 999);
 check('fresh cursor box is compact (not stretched)', caretW < 75, `${Math.round(caretW)}px`);
 
-// 12c. Slide popover opens fully on-screen (fixed, viewport-clamped)
+// 12c. Unpacked articulation variants apply in one click (no popover)
 await page.locator('.tb-icon[title="Demo riff"]').click();
 await page.waitForTimeout(200);
 await svg.locator('text', { hasText: /^5$/ }).first().click();
-await page.locator('.tb-icon[title^="Slide"]').click();
+await page.locator('.tp-artbtn', { hasText: 'Nat' }).click();
 await page.waitForTimeout(150);
-const popOnScreen = await page.evaluate(() => {
-  const p = document.querySelector('.tb-popover');
-  if (!p) return false;
-  const r = p.getBoundingClientRect();
-  return r.right <= window.innerWidth && r.left >= 0 && getComputedStyle(p).position === 'fixed';
-});
-check('slide popover fully on-screen', popOnScreen);
-await page.keyboard.press('Escape');
-await page.waitForTimeout(100);
-check('Escape closes popover', (await page.locator('.tb-popover').count()) === 0);
+check('one-click harmonic (Nat) applies', (await svg.locator('text', { hasText: /◇/ }).count()) >= 1);
 
 // 12d. Global shortcuts are swallowed while the context menu is open
 await svg.locator('text', { hasText: /^0$/ }).first().click({ button: 'right' });

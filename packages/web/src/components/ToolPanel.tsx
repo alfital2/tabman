@@ -1,10 +1,8 @@
-import { useEffect, useRef, useState } from 'react';
 import type { JSX } from 'react';
 import {
   articulationsEqual,
   defaultArticulation,
   getArticulation,
-  hasArticulation,
   noteAt,
   timeSignatureEquals,
   type Articulation,
@@ -15,6 +13,7 @@ import {
   type Note,
   type TimeSignature,
 } from '@tabkit/core';
+import { bendLabel } from '@tabkit/render';
 import { ARTICULATION_GROUPS } from '../lib/articulations';
 import { BRUSH_LADDER, brushLabel, sameBrush } from '../lib/durationBrush';
 import { TIME_SIGNATURE_PRESETS, timeSignatureLabel } from '../lib/timeSignatures';
@@ -46,80 +45,104 @@ export interface ToolPanelProps {
 function articulationIcon(type: ArticulationType): JSX.Element {
   switch (type) {
     case 'hammerOn':
-      return <HammerIcon />;
+      return <HammerIcon size={20} />;
     case 'pullOff':
-      return <PullIcon />;
+      return <PullIcon size={20} />;
     case 'slide':
-      return <SlideIcon />;
+      return <SlideIcon size={20} />;
     case 'bend':
-      return <BendIcon />;
+      return <BendIcon size={20} />;
     case 'vibrato':
-      return <VibratoIcon />;
+      return <VibratoIcon size={20} />;
     case 'letRing':
-      return <LetRingIcon />;
+      return <LetRingIcon size={20} />;
     case 'palmMute':
-      return <PalmMuteIcon />;
+      return <PalmMuteIcon size={20} />;
     case 'harmonic':
-      return <HarmonicIcon />;
+      return <HarmonicIcon size={20} />;
     case 'tap':
-      return <LetterIcon letter="T" />;
+      return <LetterIcon letter="T" size={20} />;
     case 'slap':
-      return <LetterIcon letter="S" />;
+      return <LetterIcon letter="S" size={20} />;
     case 'pop':
-      return <LetterIcon letter="P" />;
+      return <LetterIcon letter="P" size={20} />;
     case 'dead':
-      return <DeadIcon />;
+      return <DeadIcon size={20} />;
   }
 }
 
-interface VariantPopover {
-  type: ArticulationType;
-  x: number;
-  y: number;
+/** Short caption shown under each articulation button. */
+function articulationCaption(a: Articulation): string {
+  switch (a.type) {
+    case 'bend':
+      return bendLabel(a.amount);
+    case 'slide':
+      switch (a.style) {
+        case 'legato':
+          return 'Legato';
+        case 'shift':
+          return 'Shift';
+        case 'inBelow':
+          return 'In ↑';
+        case 'inAbove':
+          return 'In ↓';
+        case 'outDown':
+          return 'Out ↓';
+        case 'outUp':
+          return 'Out ↑';
+      }
+      return 'Slide';
+    case 'harmonic':
+      switch (a.kind) {
+        case 'natural':
+          return 'Nat ◇';
+        case 'artificial':
+          return 'A.H.';
+        case 'pinch':
+          return 'P.H.';
+        case 'tap':
+          return 'T.H.';
+      }
+      return 'Harm';
+    case 'hammerOn':
+      return 'Hammer';
+    case 'pullOff':
+      return 'Pull';
+    case 'vibrato':
+      return 'Vibrato';
+    case 'letRing':
+      return 'Let ring';
+    case 'palmMute':
+      return 'Palm mute';
+    case 'tap':
+      return 'Tap';
+    case 'slap':
+      return 'Slap';
+    case 'pop':
+      return 'Pop';
+    case 'dead':
+      return 'Dead';
+  }
+}
+
+/** Every articulation in a group, with its variants expanded into one-click buttons. */
+function groupEntries(group: (typeof ARTICULATION_GROUPS)[number]): Articulation[] {
+  return group.buttons.flatMap((b) => (b.variants ? b.variants.map((v) => v.value) : [defaultArticulation(b.type)]));
 }
 
 export function ToolPanel(props: ToolPanelProps): JSX.Element {
   const { state, selection, brush } = props;
-  const [popover, setPopover] = useState<VariantPopover | null>(null);
-  const panelRef = useRef<HTMLElement | null>(null);
-
-  useEffect(() => {
-    if (popover === null) return;
-    const close = (event: Event) => {
-      if (event instanceof PointerEvent && panelRef.current?.contains(event.target as Node)) return;
-      setPopover(null);
-    };
-    const onKey = (event: KeyboardEvent) => {
-      event.stopPropagation();
-      if (event.key === 'Escape') {
-        event.preventDefault();
-        setPopover(null);
-      }
-    };
-    window.addEventListener('pointerdown', close, true);
-    window.addEventListener('keydown', onKey, true);
-    window.addEventListener('scroll', close, true);
-    window.addEventListener('resize', close);
-    return () => {
-      window.removeEventListener('pointerdown', close, true);
-      window.removeEventListener('keydown', onKey, true);
-      window.removeEventListener('scroll', close, true);
-      window.removeEventListener('resize', close);
-    };
-  }, [popover]);
 
   const targetCells: readonly Cell[] = selection.length > 0 ? selection : [state.cursor];
   const targetNotes = targetCells
     .map((cell) => noteAt(state.score, cell))
     .filter((n): n is Note => n !== undefined);
   const canArticulate = targetNotes.length > 0;
-  const typeActive = (type: ArticulationType) =>
-    canArticulate && targetNotes.every((n) => hasArticulation(n.articulations, type));
-  const variantActive = (variant: Articulation) =>
+  const isActive = (a: Articulation) =>
     canArticulate &&
     targetNotes.every((n) => {
-      const existing = getArticulation(n.articulations, variant.type);
-      return existing !== undefined && articulationsEqual(existing, variant);
+      const existing = getArticulation(n.articulations, a.type);
+      return existing !== undefined && articulationsEqual(existing, a);
     });
 
   const scoreTs = state.score.tracks[0]?.bars[0]?.timeSignature;
@@ -128,20 +151,8 @@ export function ToolPanel(props: ToolPanelProps): JSX.Element {
       ? scoreTs
       : undefined;
 
-  const openVariants = (type: ArticulationType, anchor: HTMLElement) => {
-    setPopover((cur) => {
-      if (cur?.type === type) return null;
-      const r = anchor.getBoundingClientRect();
-      const width = 176;
-      // Open to the LEFT of the right-docked panel, clamped to the viewport.
-      const x = Math.max(8, Math.min(r.left - width - 6, window.innerWidth - width - 8));
-      const y = Math.min(r.top, window.innerHeight - 8 - 40);
-      return { type, x: Math.round(x), y: Math.round(Math.max(8, y)) };
-    });
-  };
-
   return (
-    <aside className="toolpanel" ref={panelRef}>
+    <aside className="toolpanel">
       <section className="tp-section">
         <h3>Note value</h3>
         <div className="tp-grid">
@@ -189,39 +200,25 @@ export function ToolPanel(props: ToolPanelProps): JSX.Element {
         {ARTICULATION_GROUPS.map((group) => (
           <div key={group.title} className="tp-artic-group">
             <h4>{group.title}</h4>
-            <div className="tp-grid">
-              {group.buttons.map((button) => {
-                if (!button.variants) {
-                  return (
-                    <button
-                      key={button.type}
-                      type="button"
-                      className={`tb-icon${typeActive(button.type) ? ' active' : ''}`}
-                      title={button.label}
-                      aria-label={button.label}
-                      disabled={!canArticulate}
-                      onClick={() => {
-                        props.onToggleArticulation(defaultArticulation(button.type));
-                      }}
-                    >
-                      {articulationIcon(button.type)}
-                    </button>
-                  );
-                }
+            <div className="tp-artic-grid">
+              {groupEntries(group).map((a) => {
+                const caption = articulationCaption(a);
+                const active = isActive(a);
                 return (
                   <button
-                    key={button.type}
+                    key={`${a.type}-${caption}`}
                     type="button"
-                    className={`tb-icon${typeActive(button.type) ? ' active' : ''}${popover?.type === button.type ? ' open' : ''}`}
-                    title={`${button.label} ▾`}
-                    aria-label={button.label}
+                    className={`tp-artbtn${active ? ' active' : ''}`}
+                    title={caption}
+                    aria-label={caption}
+                    aria-pressed={active}
                     disabled={!canArticulate}
-                    onClick={(e) => {
-                      openVariants(button.type, e.currentTarget);
+                    onClick={() => {
+                      props.onToggleArticulation(a);
                     }}
                   >
-                    {articulationIcon(button.type)}
-                    <span className="tb-badge">▾</span>
+                    {articulationIcon(a.type)}
+                    <span className="tp-cap">{caption}</span>
                   </button>
                 );
               })}
@@ -229,29 +226,6 @@ export function ToolPanel(props: ToolPanelProps): JSX.Element {
           </div>
         ))}
       </section>
-
-      {popover &&
-        (() => {
-          const button = ARTICULATION_GROUPS.flatMap((g) => g.buttons).find((b) => b.type === popover.type);
-          if (!button?.variants) return null;
-          return (
-            <div className="tb-popover" style={{ left: popover.x, top: popover.y }} role="menu">
-              {button.variants.map((variant) => (
-                <button
-                  key={variant.label}
-                  type="button"
-                  className={`tb-menu-item${variantActive(variant.value) ? ' active' : ''}`}
-                  onClick={() => {
-                    props.onToggleArticulation(variant.value);
-                    setPopover(null);
-                  }}
-                >
-                  {variant.label}
-                </button>
-              ))}
-            </div>
-          );
-        })()}
     </aside>
   );
 }

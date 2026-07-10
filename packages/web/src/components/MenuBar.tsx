@@ -162,7 +162,6 @@ export function MenuBar(props: MenuBarProps): JSX.Element {
         />
       </div>
 
-      <div className="tb-spacer" />
       {props.statusMessage !== null && <span className="tb-status-msg">{props.statusMessage}</span>}
     </header>
   );
