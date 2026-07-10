@@ -17,7 +17,7 @@ page.on('console', (msg) => {
   if (msg.type() === 'error') errors.push(`console: ${msg.text()}`);
 });
 
-await page.goto('http://localhost:5173/', { waitUntil: 'networkidle' });
+await page.goto(process.env.E2E_URL ?? 'http://localhost:5173/', { waitUntil: 'networkidle' });
 await page.evaluate(() => { localStorage.clear(); localStorage.setItem('tabkit.shortcuts-dismissed.v0', '1'); });
 await page.reload({ waitUntil: 'networkidle' });
 await page.waitForTimeout(400);
@@ -241,15 +241,15 @@ check('context menu has Add chord', (await page.locator('.menu-item', { hasText:
 check('note-duration row uses SVG icons', (await page.locator('.menu-chip.glyph svg').count()) === 5);
 await page.locator('.menu-item', { hasText: 'Add chord' }).click();
 await page.waitForTimeout(150);
-check('chord picker opens', (await page.locator('.cp-dialog').count()) === 1);
-await page.locator('.cp-search').fill('Am7');
+check('chord input opens', (await page.locator('.chord-input-field').count()) === 1);
+await page.locator('.chord-input-field').fill('Am7');
 await page.waitForTimeout(120);
-await page.locator('.cp-name', { hasText: 'Am7' }).first().click();
-await page.waitForTimeout(120);
-check('chord shows voicing diagrams', (await page.locator('.cp-voicing svg circle').count()) > 0);
-await page.locator('.cp-voicing').first().click();
+check('chord suggestions appear', (await page.locator('.chord-input-item').count()) > 0);
+check('top suggestion is the typed chord', (await page.locator('.chord-input-item').first().innerText()).trim() === 'Am7');
+await page.keyboard.press('Enter');
 await page.waitForTimeout(700);
-check('picker closes after picking a voicing', (await page.locator('.cp-dialog').count()) === 0);
+check('chord input closes after picking', (await page.locator('.chord-input-field').count()) === 0);
+check('chord name renders above the column', (await svg.locator('text', { hasText: /^Am7$/ }).count()) >= 1);
 const chordDoc = await page.evaluate(() => JSON.parse(localStorage.getItem('tabkit.current-document.v0') || 'null'));
 const chordNotes = chordDoc?.tracks?.[0]?.bars?.[0]?.voices?.[0]?.beats?.[0]?.notes?.length ?? 0;
 check('chord inserted as multiple notes', chordNotes >= 3, `${chordNotes} notes`);

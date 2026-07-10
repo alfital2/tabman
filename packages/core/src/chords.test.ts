@@ -5,11 +5,14 @@ import {
   getChord,
   listChordNames,
   parseChordName,
+  recognizeChord,
   ROOT_NAMES,
   searchChords,
   voicingPitchClasses,
 } from './chords';
-import { MAX_FRET } from './pitch';
+import { defaultArticulation } from './articulation';
+import { createNote } from './model';
+import { MAX_FRET, STANDARD_GUITAR_TUNING } from './pitch';
 
 describe('parseChordName', () => {
   it('parses roots, accidentals and qualities', () => {
@@ -120,3 +123,40 @@ describe('search', () => {
 function voicingKeyEq(a: readonly (number | null)[], b: readonly (number | null)[]): boolean {
   return a.length === b.length && a.every((x, i) => x === b[i]);
 }
+
+describe('recognizeChord', () => {
+  const notesFromFrets = (frets: readonly (number | null)[]) =>
+    frets.flatMap((fret, string) => (fret === null ? [] : [createNote(string, fret)]));
+  const recognize = (frets: readonly (number | null)[]) => recognizeChord(notesFromFrets(frets), STANDARD_GUITAR_TUNING);
+
+  it("names each DB voicing back to the chord's name", () => {
+    for (const name of ['C', 'Am', 'G7', 'Dm', 'Fmaj7', 'Em7', 'C5']) {
+      const voicing = getChord(name)!.voicings[0]!;
+      expect(recognize(voicing.frets)).toBe(name);
+    }
+  });
+
+  it('names the screenshot voicing (e10 B13 G12 D12 A10) as Gsus4', () => {
+    // our string order: [e, B, G, D, A, E]
+    expect(recognize([10, 13, 12, 12, 10, null])).toBe('Gsus4');
+  });
+
+  it('recognizes a bare power chord', () => {
+    // low E + A at fret 3 → G5
+    expect(recognizeChord([createNote(5, 3), createNote(4, 5)], STANDARD_GUITAR_TUNING)).toBe('G5');
+  });
+
+  it('leaves single notes and unrecognized stacks unnamed', () => {
+    expect(recognizeChord([createNote(0, 5)], STANDARD_GUITAR_TUNING)).toBeNull();
+    // a bare major third (E + G#) is no supported chord
+    expect(recognizeChord([createNote(5, 0), createNote(4, 6)], STANDARD_GUITAR_TUNING)).toBeNull();
+  });
+
+  it('ignores muted (dead) strings', () => {
+    const withDead = [
+      ...notesFromFrets(getChord('C')!.voicings[0]!.frets),
+      createNote(5, 0, { articulations: [defaultArticulation('dead')] }),
+    ];
+    expect(recognizeChord(withDead, STANDARD_GUITAR_TUNING)).toBe('C');
+  });
+});

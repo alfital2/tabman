@@ -54,7 +54,6 @@ import type { HitCell } from '@tabkit/render';
 import type { Tone } from '@tabkit/playback';
 import { ContextMenu } from './components/ContextMenu';
 import { SheetHeader } from './components/SheetHeader';
-import { ChordPicker } from './components/ChordPicker';
 import { MenuBar } from './components/MenuBar';
 import { ShortcutsDialog } from './components/ShortcutsDialog';
 import { ToolPanel } from './components/ToolPanel';
@@ -480,6 +479,18 @@ export function App(): JSX.Element {
               state={state}
               selection={selection}
               playhead={player.playhead}
+              chordCell={chordPickerCell}
+              onChordCommit={(frets) => {
+                const at = chordPickerCell;
+                if (!at) return;
+                const positioned = placeCursor(stateRef.current, { bar: at.bar, beat: at.beat, string: at.string });
+                apply(setChordAtCursor(positioned, frets, brushRef.current));
+                clearSelection();
+                setChordPickerCell(null);
+              }}
+              onChordCancel={() => {
+                setChordPickerCell(null);
+              }}
               onPick={(cell) => {
                 typedRef.current = null;
                 apply(placeCursor(stateRef.current, cell));
@@ -557,20 +568,6 @@ export function App(): JSX.Element {
       </footer>
       {menuNode}
       {showShortcuts && <ShortcutsDialog onClose={closeShortcuts} />}
-      {chordPickerCell && (
-        <ChordPicker
-          onPick={(frets) => {
-            const at = chordPickerCell;
-            const positioned = placeCursor(stateRef.current, { bar: at.bar, beat: at.beat, string: at.string });
-            apply(setChordAtCursor(positioned, frets, brushRef.current));
-            clearSelection();
-            setChordPickerCell(null);
-          }}
-          onClose={() => {
-            setChordPickerCell(null);
-          }}
-        />
-      )}
     </div>
   );
 }

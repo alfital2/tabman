@@ -1,4 +1,6 @@
-import { MAX_FRET, STANDARD_GUITAR_TUNING } from './pitch';
+import { getArticulation } from './articulation';
+import type { Note } from './model';
+import { fretToMidi, MAX_FRET, STANDARD_GUITAR_TUNING, type Tuning } from './pitch';
 
 /**
  * A chord voicing: one fret per string in the app's string order
@@ -259,4 +261,48 @@ export function voicingPitchClasses(voicing: ChordVoicing): number[] {
 
 export function chordIntervals(qualityKey: string): readonly number[] {
   return QUALITY_BY_KEY.get(qualityKey)?.intervals ?? [];
+}
+
+// ---------------------------------------------------------------------------
+// Recognition (frets → name)
+
+function setsEqual(a: ReadonlySet<number>, b: ReadonlySet<number>): boolean {
+  return a.size === b.size && [...a].every((v) => b.has(v));
+}
+
+/**
+ * Name the chord a beat's notes sound, or `null` when they don't form a
+ * supported chord. Derived live from the notes — nothing is stored.
+ *
+ * The lowest-sounding note is tried as the root first, so root-position
+ * voicings name naturally; an inversion falls through to its true root (named
+ * without slash notation). Only exact pitch-class-set matches against
+ * {@link CHORD_QUALITIES} count — a stack with extra or missing tones is
+ * left unnamed. Muted (dead) strings carry no pitch and are ignored.
+ */
+export function recognizeChord(notes: readonly Note[], tuning: Tuning): string | null {
+  const midis: number[] = [];
+  for (const note of notes) {
+    if (getArticulation(note.articulations, 'dead') !== undefined) continue;
+    if (tuning[note.string] === undefined) continue;
+    midis.push(fretToMidi(tuning, note.string, note.fret));
+  }
+  if (midis.length < 2) return null;
+
+  const pc = (n: number) => ((n % 12) + 12) % 12;
+  const bass = pc(Math.min(...midis));
+  const classes = new Set(midis.map(pc));
+  if (classes.size < 2) return null;
+
+  // Bass first (root position), then remaining classes low→high.
+  const roots = [bass, ...[...classes].filter((c) => c !== bass).sort((a, b) => a - b)];
+  for (const root of roots) {
+    const intervals = new Set([...classes].map((c) => pc(c - root)));
+    for (const q of CHORD_QUALITIES) {
+      if (setsEqual(new Set(q.intervals), intervals)) {
+        return chordName(root, q.key);
+      }
+    }
+  }
+  return null;
 }

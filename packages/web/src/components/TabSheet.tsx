@@ -24,6 +24,7 @@ import {
 import { CLICK_SLOP, normalizedRect, resolveGesture, type GestureMode } from '../lib/gestures';
 import { cellKey, cellsInRect } from '../lib/selection';
 import type { PlayheadPosition } from '../hooks/useTabPlayer';
+import { ChordInput } from './ChordInput';
 
 export const SCALE = 1.3;
 
@@ -31,6 +32,10 @@ export interface TabSheetProps {
   state: EditorState;
   selection: readonly Cell[];
   playhead: PlayheadPosition | null;
+  /** When set, a type-to-add chord box floats above this column. */
+  chordCell: HitCell | null;
+  onChordCommit(frets: readonly (number | null)[]): void;
+  onChordCancel(): void;
   onPick(cell: HitCell): void;
   onSelect(cells: Cell[]): void;
   onMoveNote(from: Cell, toString: number): void;
@@ -376,6 +381,10 @@ export function TabSheet(props: TabSheetProps): JSX.Element {
     );
   }
 
+  // Anchor for the type-to-add chord box: the top-center of its column, in the
+  // same pixel frame as the SVG (both sit at the origin of .sheet-canvas).
+  const chordBox = props.chordCell ? slotRect(layout, props.chordCell.bar, props.chordCell.beat) : null;
+
   return (
     <div
       className="tab-sheet-svg"
@@ -390,16 +399,26 @@ export function TabSheet(props: TabSheetProps): JSX.Element {
       role="application"
       aria-label="Guitar tablature editor"
     >
-      <svg
-        ref={svgRef}
-        width={layout.width * SCALE}
-        height={layout.height * SCALE}
-        viewBox={`0 0 ${String(layout.width)} ${String(layout.height)}`}
-      >
-        {overlays}
-        {primitives}
-        {topOverlays}
-      </svg>
+      <div className="sheet-canvas">
+        <svg
+          ref={svgRef}
+          width={layout.width * SCALE}
+          height={layout.height * SCALE}
+          viewBox={`0 0 ${String(layout.width)} ${String(layout.height)}`}
+        >
+          {overlays}
+          {primitives}
+          {topOverlays}
+        </svg>
+        {props.chordCell && chordBox && (
+          <div
+            className="chord-input-anchor"
+            style={{ left: (chordBox.x + chordBox.width / 2) * SCALE, top: chordBox.y * SCALE }}
+          >
+            <ChordInput onCommit={props.onChordCommit} onCancel={props.onChordCancel} />
+          </div>
+        )}
+      </div>
     </div>
   );
 }

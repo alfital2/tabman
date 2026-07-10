@@ -10,6 +10,7 @@ export interface Theme {
   readonly fret: string;
   readonly fretBackground: string;
   readonly measureNumber: string;
+  readonly chordName: string;
   readonly clef: string;
   readonly timeSignature: string;
   readonly articulation: string;
@@ -28,6 +29,7 @@ export const DEFAULT_THEME: Theme = Object.freeze({
   fret: '#15171c',
   fretBackground: '#ffffff',
   measureNumber: '#c0392b',
+  chordName: '#1f4bd8',
   clef: '#9095a0',
   timeSignature: '#2b2f38',
   articulation: '#2f6bff',
@@ -75,6 +77,8 @@ export function textStyle(theme: Theme, role: TextRole): TextStyle {
       return { fill: theme.fret, fontFamily: theme.monoFontFamily, fontWeight: 'normal' };
     case 'measureNumber':
       return { fill: theme.measureNumber, fontFamily: theme.monoFontFamily, fontWeight: 'normal' };
+    case 'chordName':
+      return { fill: theme.chordName, fontFamily: theme.serifFontFamily, fontWeight: 'bold' };
     case 'clef':
       return { fill: theme.clef, fontFamily: theme.serifFontFamily, fontWeight: 'bold' };
     case 'timeSignature':

@@ -3,6 +3,7 @@ import {
   barFilledInWholes,
   compareFractions,
   getArticulation,
+  recognizeChord,
   timeSignatureEquals,
   type Bar,
   type BendAmount,
@@ -373,6 +374,21 @@ export function layoutScore(score: Score, metrics: Metrics = DEFAULT_METRICS, op
           }
         }
         stemsAtLevel.push({ cx, levels: beamLevels(beat) });
+
+        // Chord name above the column — derived live from the notes it sounds.
+        const chord = track ? recognizeChord(beat.notes, track.tuning) : null;
+        if (chord !== null) {
+          primitives.push({
+            kind: 'text',
+            role: 'chordName',
+            x: cx,
+            y: top - m.staffLineGap * 0.85,
+            text: chord,
+            fontSize: m.fretFontSize,
+            anchor: 'middle',
+            baseline: 'auto',
+          });
+        }
 
         for (const note of beat.notes) {
           const y = stringYs[Math.min(note.string, stringCount - 1)]!;
