@@ -57,7 +57,8 @@ body {
   display: flex;
   flex: 1;
   min-height: 0;
-  padding: 16px 16px 0;
+  gap: 14px;
+  padding: 14px 16px 0;
 }
 
 /* ---- sheet ---- */
@@ -165,18 +166,79 @@ body {
   font-family: 'SF Mono', Menlo, monospace;
 }
 
-/* ---- top toolbar ---- */
+/* ---- top menu bar (transport + file) ---- */
 
-.toolbar {
+.menubar {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
   gap: 6px 10px;
   padding: 8px 14px;
-  background: linear-gradient(#2b2e35, #282b31);
-  border-bottom: 1px solid #383c45;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+  /* Distinct blue-slate so the menu bar reads as the app chrome, separate from
+     the neutral-grey tool panel and the white page. */
+  background: linear-gradient(#2c3346, #232839);
+  border-bottom: 1px solid #151821;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35);
   flex: 0 0 auto;
+}
+
+/* ---- right tool panel (note value / time / articulations) ---- */
+
+.toolpanel {
+  width: 236px;
+  flex: 0 0 236px;
+  align-self: stretch;
+  overflow-y: auto;
+  background: #2b2e35;
+  border: 1px solid #383c45;
+  border-radius: 8px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.tp-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.tp-section h3 {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #9aa0ac;
+  margin: 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+
+.tp-target {
+  font-size: 10px;
+  color: #6f7580;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.tp-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.tp-artic-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.tp-artic-group h4 {
+  font-size: 10.5px;
+  color: #848a96;
+  margin: 5px 0 0;
+  font-weight: 600;
 }
 
 .tb-section {
@@ -539,19 +601,36 @@ body {
   color: #ffffff;
 }
 
-/* ---- responsive: the toolbar wraps to more rows on narrow screens ---- */
+/* ---- responsive: menu bar wraps; tool panel drops below the page ---- */
 
 @media (max-width: 1024px) {
-  .toolbar {
+  .menubar {
     gap: 5px 8px;
     padding: 7px 10px;
   }
 
-  .tb-label {
-    display: none;
+  .workspace {
+    flex-direction: column;
+    overflow-y: auto;
+    padding: 12px 10px 0;
   }
 
-  .workspace {
-    padding: 12px 10px 0;
+  .sheet-area {
+    overflow: visible;
+    flex: none;
+  }
+
+  .toolpanel {
+    width: 100%;
+    flex: none;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: 18px;
+  }
+
+  .tp-section {
+    min-width: 180px;
+    flex: 1;
   }
 }

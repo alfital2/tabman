@@ -43,7 +43,8 @@ import type { HitCell } from '@tabkit/render';
 import type { Tone } from '@tabkit/playback';
 import { ContextMenu } from './components/ContextMenu';
 import { SheetHeader } from './components/SheetHeader';
-import { Toolbar } from './components/Toolbar';
+import { MenuBar } from './components/MenuBar';
+import { ToolPanel } from './components/ToolPanel';
 import { TabSheet } from './components/TabSheet';
 import { useTabKeyboard } from './hooks/useTabKeyboard';
 import { useTabPlayer } from './hooks/useTabPlayer';
@@ -356,10 +357,8 @@ export function App(): JSX.Element {
 
   return (
     <div className="app">
-      <Toolbar
+      <MenuBar
         state={state}
-        selection={selection}
-        brush={brush}
         tone={tone}
         speed={speed}
         metronome={metronome}
@@ -394,12 +393,6 @@ export function App(): JSX.Element {
         }}
         onExport={onExport}
         onImport={onImport}
-        onBrush={onBrushPick}
-        onScoreTimeSignature={(ts) => {
-          apply(setScoreTimeSignature(stateRef.current, ts));
-          clearSelection();
-        }}
-        onToggleArticulation={onToggleArticulation}
       />
       <div className="workspace">
         <div className="sheet-area">
@@ -466,6 +459,17 @@ export function App(): JSX.Element {
             />
           </div>
         </div>
+        <ToolPanel
+          state={state}
+          selection={selection}
+          brush={brush}
+          onBrush={onBrushPick}
+          onScoreTimeSignature={(ts) => {
+            apply(setScoreTimeSignature(stateRef.current, ts));
+            clearSelection();
+          }}
+          onToggleArticulation={onToggleArticulation}
+        />
       </div>
       <footer className="statusbar">
         <span>
