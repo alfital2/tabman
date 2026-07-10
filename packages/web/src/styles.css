@@ -176,35 +176,34 @@ body {
   justify-content: center; /* centered chrome, not left/right aligned */
   gap: 6px 12px;
   padding: 9px 14px;
-  /* Bright indigo→violet band — the app chrome, distinct from the grey panel
-     and white page. Controls below are restyled for contrast on it. */
-  background: linear-gradient(100deg, #4f6bff 0%, #7c4dff 100%);
-  border-bottom: 1px solid rgba(0, 0, 0, 0.25);
-  box-shadow: 0 2px 12px rgba(40, 30, 90, 0.4);
+  /* Light "paper white" bar — clean chrome above the page; controls are dark. */
+  background: linear-gradient(#ffffff, #eef1f6);
+  border-bottom: 1px solid #d6dbe4;
+  box-shadow: 0 1px 6px rgba(20, 25, 45, 0.12);
   flex: 0 0 auto;
 }
 
-/* High-contrast controls on the bright bar */
+/* Dark controls on the light bar */
 .menubar .tb-icon {
-  color: rgba(255, 255, 255, 0.9);
+  color: #4a505c;
 }
 .menubar .tb-icon:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.18);
-  color: #fff;
+  background: #e5e9f0;
+  color: #14171d;
 }
 .menubar .tb-icon.active {
-  background: #fff;
-  border-color: #fff;
-  color: #4f6bff;
+  background: #2f6bff;
+  border-color: #2f6bff;
+  color: #fff;
 }
 .menubar .tb-divider,
 .menubar .tb-mini-divider {
-  background: rgba(255, 255, 255, 0.28);
+  background: #d3d8e1;
 }
 .menubar .tb-play {
-  background: #fff;
-  border-color: #fff;
-  color: #4a54e0;
+  background: linear-gradient(#3f74ff, #2f6bff);
+  border-color: #2f6bff;
+  color: #fff;
 }
 .menubar .tb-play.playing {
   background: linear-gradient(#ff5a52, #e33a32);
@@ -212,53 +211,45 @@ body {
   color: #fff;
 }
 .menubar .tb-tempo {
-  background: rgba(255, 255, 255, 0.16);
-  border-color: rgba(255, 255, 255, 0.28);
-  color: #fff;
+  background: #ffffff;
+  border-color: #d3d8e1;
+  color: #262b34;
 }
 .menubar .tb-tempo .tb-eq {
-  color: rgba(255, 255, 255, 0.85);
+  color: #6b7280;
 }
 .menubar .tb-tempo input {
-  color: #fff;
+  color: #14171d;
 }
 .menubar .tb-speed {
-  background: rgba(255, 255, 255, 0.14);
-  border-color: rgba(255, 255, 255, 0.26);
+  background: #ffffff;
+  border-color: #d3d8e1;
 }
 .menubar .tb-chip {
-  color: rgba(255, 255, 255, 0.85);
+  color: #4a505c;
 }
 .menubar .tb-chip:hover:not(:disabled):not(.active) {
-  background: rgba(255, 255, 255, 0.18);
-  color: #fff;
+  background: #e5e9f0;
+  color: #14171d;
 }
 .menubar .tb-chip.active {
-  background: #fff;
-  color: #4f6bff;
+  background: #2f6bff;
+  color: #fff;
 }
 .menubar .tb-select {
-  background: rgba(255, 255, 255, 0.16);
-  border-color: rgba(255, 255, 255, 0.28);
-  color: #fff;
+  background: #ffffff;
+  border-color: #d3d8e1;
+  color: #262b34;
 }
 .menubar .tb-select option {
   color: #15171c;
-}
-.menubar .tb-text-chip {
-  background: rgba(255, 255, 255, 0.16);
-  border-color: rgba(255, 255, 255, 0.28);
-  color: #fff;
-}
-.menubar .tb-text-chip:hover {
-  background: rgba(255, 255, 255, 0.28);
 }
 .menubar .tb-status-msg {
   position: absolute;
   right: 14px;
   top: 50%;
   transform: translateY(-50%);
-  color: #fff;
+  color: #2f8a4a;
 }
 
 /* ---- right tool panel (note value / time / articulations) ---- */
@@ -655,6 +646,152 @@ body {
 .statusbar .hints {
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/* ---- shortcuts dialog ---- */
+
+.sc-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: rgba(10, 12, 18, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  backdrop-filter: blur(2px);
+}
+
+.sc-dialog {
+  width: min(720px, 100%);
+  max-height: 88vh;
+  overflow-y: auto;
+  background: #262a32;
+  border: 1px solid #3d4250;
+  border-radius: 12px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.55);
+  padding: 20px 22px;
+}
+
+.sc-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.sc-head h2 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.sc-x {
+  background: none;
+  border: none;
+  color: #9aa0ac;
+  font-size: 16px;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 6px;
+}
+
+.sc-x:hover {
+  background: #343945;
+  color: #fff;
+}
+
+.sc-lead {
+  margin: 6px 0 14px;
+  color: #aeb3bd;
+  font-size: 13px;
+}
+
+.sc-cols {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 10px 22px;
+}
+
+.sc-col h3 {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #8a909c;
+  margin: 4px 0 6px;
+}
+
+.sc-col dl {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.sc-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sc-row dt {
+  display: flex;
+  gap: 3px;
+  flex: 0 0 auto;
+  min-width: 76px;
+}
+
+.sc-row dd {
+  margin: 0;
+  color: #cdd1da;
+  font-size: 12.5px;
+}
+
+.kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 20px;
+  padding: 0 5px;
+  font-size: 11px;
+  font-family: 'SF Mono', Menlo, monospace;
+  color: #e7e9ee;
+  background: #333945;
+  border: 1px solid #454b58;
+  border-bottom-width: 2px;
+  border-radius: 5px;
+}
+
+.sc-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid #363b45;
+}
+
+.sc-dontshow {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 13px;
+  color: #aeb3bd;
+  cursor: pointer;
+}
+
+.sc-ok {
+  padding: 8px 18px;
+  border-radius: 8px;
+  border: 1px solid #2f6bff;
+  background: linear-gradient(#3f74ff, #2f6bff);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.sc-ok:hover {
+  filter: brightness(1.08);
 }
 
 /* ---- context menu ---- */

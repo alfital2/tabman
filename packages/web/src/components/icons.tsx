@@ -148,6 +148,19 @@ export function DemoIcon({ size = 20 }: IconProps): JSX.Element {
     size,
   );
 }
+export function KeyboardIcon({ size = 20 }: IconProps): JSX.Element {
+  return svg(
+    [
+      <rect key="a" x="3" y="6.5" width="18" height="11" rx="2" {...stroke} />,
+      <line key="b" x1="7" y1="10" x2="7" y2="10.2" {...stroke} />,
+      <line key="c" x1="11" y1="10" x2="11" y2="10.2" {...stroke} />,
+      <line key="d" x1="15" y1="10" x2="15" y2="10.2" {...stroke} />,
+      <line key="e" x1="8" y1="14" x2="16" y2="14" {...stroke} />,
+    ],
+    size,
+  );
+}
+
 export function StarIcon({ size = 20 }: IconProps): JSX.Element {
   return svg(
     <path d="M12 4 L13.8 9.2 L19.2 9.4 L14.9 12.7 L16.4 18 L12 14.9 L7.6 18 L9.1 12.7 L4.8 9.4 L10.2 9.2 Z" fill="currentColor" stroke="none" />,

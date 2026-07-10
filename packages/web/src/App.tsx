@@ -3,12 +3,18 @@ import type { JSX } from 'react';
 import {
   beatAt,
   beatsForCells,
+  bend,
+  BEND_AMOUNTS,
   clearAtCursor,
   createDefaultScore,
   createEditor,
+  defaultArticulation,
   deleteBar,
   deleteCells,
   duplicateBar,
+  getArticulation,
+  harmonic,
+  HARMONIC_KINDS,
   insertBar,
   insertBarValue,
   MAX_HISTORY,
@@ -17,6 +23,7 @@ import {
   moveNotesByStringDelta,
   moveNotesToSlot,
   moveNoteToString,
+  noteAt,
   pasteBeatsAtCursor,
   placeCursor,
   redo,
@@ -27,10 +34,13 @@ import {
   setFretAtCursor,
   setScoreMeta,
   setScoreTimeSignature,
+  slide,
+  SLIDE_STYLES,
   toggleArticulation,
   undo,
   QUARTER,
   type Articulation,
+  type ArticulationType,
   type Cell,
   type Direction,
   type Duration,
@@ -44,6 +54,7 @@ import type { Tone } from '@tabkit/playback';
 import { ContextMenu } from './components/ContextMenu';
 import { SheetHeader } from './components/SheetHeader';
 import { MenuBar } from './components/MenuBar';
+import { ShortcutsDialog } from './components/ShortcutsDialog';
 import { ToolPanel } from './components/ToolPanel';
 import { TabSheet } from './components/TabSheet';
 import { useTabKeyboard } from './hooks/useTabKeyboard';
@@ -66,9 +77,39 @@ interface MenuState {
   cell: HitCell;
 }
 
+/** The next variant of a parameterized articulation for Shift+key cycling,
+ * based on what the first targeted note currently carries. */
+function nextVariant(score: Score, cells: readonly Cell[], type: ArticulationType): Articulation {
+  const note = cells.map((c) => noteAt(score, c)).find((n) => n !== undefined);
+  const existing = note ? getArticulation(note.articulations, type) : undefined;
+  if (type === 'bend') {
+    const cur = existing?.type === 'bend' ? BEND_AMOUNTS.indexOf(existing.amount) : -1;
+    return bend(BEND_AMOUNTS[(cur + 1) % BEND_AMOUNTS.length]!);
+  }
+  if (type === 'slide') {
+    const cur = existing?.type === 'slide' ? SLIDE_STYLES.indexOf(existing.style) : -1;
+    return slide(SLIDE_STYLES[(cur + 1) % SLIDE_STYLES.length]!);
+  }
+  if (type === 'harmonic') {
+    const cur = existing?.type === 'harmonic' ? HARMONIC_KINDS.indexOf(existing.kind) : -1;
+    return harmonic(HARMONIC_KINDS[(cur + 1) % HARMONIC_KINDS.length]!);
+  }
+  return defaultArticulation(type);
+}
+
 function initialEditor(): EditorState {
   const stored = typeof localStorage === 'undefined' ? null : loadStoredScore(localStorage);
   return createEditor(stored ?? createDefaultScore());
+}
+
+const SHORTCUTS_DISMISSED_KEY = 'tabkit.shortcuts-dismissed.v0';
+
+function shortcutsInitiallyOpen(): boolean {
+  try {
+    return localStorage.getItem(SHORTCUTS_DISMISSED_KEY) !== '1';
+  } catch {
+    return true;
+  }
 }
 
 export function App(): JSX.Element {
@@ -81,6 +122,18 @@ export function App(): JSX.Element {
   const [clipboard, setClipboard] = useState<ClipboardContent | null>(null);
   const [menu, setMenu] = useState<MenuState | null>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  const [showShortcuts, setShowShortcuts] = useState<boolean>(shortcutsInitiallyOpen);
+
+  const closeShortcuts = useCallback((dontShowAgain: boolean) => {
+    setShowShortcuts(false);
+    if (dontShowAgain) {
+      try {
+        localStorage.setItem(SHORTCUTS_DISMISSED_KEY, '1');
+      } catch {
+        /* private mode — the dialog just reappears next load */
+      }
+    }
+  }, []);
 
   const player = useTabPlayer();
 
@@ -152,6 +205,17 @@ export function App(): JSX.Element {
     },
     [apply, clearSelection, player],
   );
+
+  // Example scores are no longer buttons in the UI; expose them on a dev global
+  // so tests (and the console) can still load them.
+  useEffect(() => {
+    (window as unknown as { __tabkit?: Record<string, () => void> }).__tabkit = {
+      loadNew: () => loadScore(createDefaultScore()),
+      loadDemo: () => loadScore(demoScore()),
+      loadShowcase: () => loadScore(showcaseScore()),
+      loadNothingElse: () => loadScore(nothingElseMatters()),
+    };
+  }, [loadScore]);
 
   const togglePlay = useCallback(() => {
     if (player.isPlaying) {
@@ -242,6 +306,14 @@ export function App(): JSX.Element {
     onDuplicate: () => {
       apply(duplicateBar(stateRef.current, stateRef.current.cursor.bar));
       clearSelection();
+    },
+    onArticulation: (type, cycle) => {
+      const current = stateRef.current;
+      const cells = selectionRef.current.length > 0 ? selectionRef.current : [current.cursor];
+      // Shift cycles bend/slide/harmonic through their variants (always a new
+      // variant → replaces, never toggles off); the base key toggles the default.
+      const articulation = cycle ? nextVariant(current.score, cells, type) : defaultArticulation(type);
+      apply(toggleArticulation(current, cells, articulation));
     },
   });
 
@@ -374,15 +446,6 @@ export function App(): JSX.Element {
         onNew={() => {
           loadScore(createDefaultScore());
         }}
-        onLoadDemo={() => {
-          loadScore(demoScore());
-        }}
-        onLoadShowcase={() => {
-          loadScore(showcaseScore());
-        }}
-        onLoadNothingElse={() => {
-          loadScore(nothingElseMatters());
-        }}
         onUndo={() => {
           apply(undo(stateRef.current));
           clearSelection();
@@ -393,6 +456,9 @@ export function App(): JSX.Element {
         }}
         onExport={onExport}
         onImport={onImport}
+        onShowShortcuts={() => {
+          setShowShortcuts(true);
+        }}
       />
       <div className="workspace">
         <div className="sheet-area">
@@ -483,6 +549,7 @@ export function App(): JSX.Element {
         </span>
       </footer>
       {menuNode}
+      {showShortcuts && <ShortcutsDialog onClose={closeShortcuts} />}
     </div>
   );
 }

@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import type { Direction } from '@tabkit/core';
+import type { ArticulationType, Direction } from '@tabkit/core';
 
 export interface TabKeyboardHandlers {
   onDigit(digit: number): void;
@@ -14,6 +14,31 @@ export interface TabKeyboardHandlers {
   onCopy(): void;
   onPaste(): void;
   onDuplicate(): void;
+  /** Apply/toggle an articulation on the targeted note(s); cycle = Shift held. */
+  onArticulation(type: ArticulationType, cycle: boolean): void;
+}
+
+/** Single-letter shortcut → articulation type. Digits are fret entry, so
+ * letters are free and never collide with browser (Cmd/Ctrl/Alt) shortcuts. */
+export const ARTICULATION_KEYS: Readonly<Record<string, ArticulationType>> = {
+  h: 'hammerOn',
+  p: 'pullOff',
+  s: 'slide',
+  b: 'bend',
+  v: 'vibrato',
+  m: 'palmMute',
+  r: 'letRing',
+  t: 'tap',
+  a: 'slap',
+  o: 'pop',
+  x: 'dead',
+  n: 'harmonic',
+};
+
+/** The base shortcut key for an articulation type (for tooltips). */
+export function articulationKeyHint(type: ArticulationType): string | undefined {
+  const entry = Object.entries(ARTICULATION_KEYS).find(([, t]) => t === type);
+  return entry?.[0];
 }
 
 function isEditableTarget(target: EventTarget | null): boolean {
@@ -107,6 +132,14 @@ export function useTabKeyboard(handlers: TabKeyboardHandlers): void {
       if (event.key.length === 1 && event.key >= '0' && event.key <= '9') {
         event.preventDefault();
         h.onDigit(Number(event.key));
+        return;
+      }
+      if (event.key.length === 1) {
+        const type = ARTICULATION_KEYS[event.key.toLowerCase()];
+        if (type) {
+          event.preventDefault();
+          h.onArticulation(type, event.shiftKey);
+        }
       }
     };
     window.addEventListener('keydown', onKeyDown);

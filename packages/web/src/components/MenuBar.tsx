@@ -2,16 +2,15 @@ import { useEffect, useRef, useState } from 'react';
 import type { JSX, ReactNode } from 'react';
 import { clampTempo, type EditorState } from '@tabkit/core';
 import type { Tone } from '@tabkit/playback';
-import { NoteValueIcon } from './icons';
 import {
-  DemoIcon,
   ExportIcon,
   ImportIcon,
+  KeyboardIcon,
   MetronomeIcon,
   NewIcon,
+  NoteValueIcon,
   PlayIcon,
   RedoIcon,
-  StarIcon,
   StopIcon,
   UndoIcon,
 } from './icons';
@@ -31,13 +30,11 @@ export interface MenuBarProps {
   onTone(tone: Tone): void;
   onMetronome(on: boolean): void;
   onNew(): void;
-  onLoadDemo(): void;
-  onLoadShowcase(): void;
-  onLoadNothingElse(): void;
   onUndo(): void;
   onRedo(): void;
   onExport(): void;
   onImport(file: File): void;
+  onShowShortcuts(): void;
 }
 
 export function MenuBar(props: MenuBarProps): JSX.Element {
@@ -144,11 +141,7 @@ export function MenuBar(props: MenuBarProps): JSX.Element {
         {iconBtn(<UndoIcon />, 'Undo', props.onUndo, { disabled: !state.canUndo })}
         {iconBtn(<RedoIcon />, 'Redo', props.onRedo, { disabled: !state.canRedo })}
         <span className="tb-mini-divider" />
-        {iconBtn(<DemoIcon />, 'Demo riff', props.onLoadDemo)}
-        {iconBtn(<StarIcon />, 'Feature showcase', props.onLoadShowcase)}
-        <button type="button" className="tb-text-chip" title="Nothing Else Matters (intro)" onClick={props.onLoadNothingElse}>
-          NEM
-        </button>
+        {iconBtn(<KeyboardIcon />, 'Keyboard shortcuts', props.onShowShortcuts)}
         <input
           ref={fileInputRef}
           type="file"

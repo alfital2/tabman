@@ -18,7 +18,7 @@ page.on('console', (msg) => {
 });
 
 await page.goto('http://localhost:5173/', { waitUntil: 'networkidle' });
-await page.evaluate(() => localStorage.clear());
+await page.evaluate(() => { localStorage.clear(); localStorage.setItem('tabkit.shortcuts-dismissed.v0', '1'); });
 await page.reload({ waitUntil: 'networkidle' });
 await page.waitForTimeout(400);
 
@@ -74,7 +74,7 @@ check('cmd+shift+z redoes', (await svg.locator('text', { hasText: /^9$/ }).count
 // 6. Articulation via panel: select note first (click the "12" fret)
 const twelve = svg.locator('text', { hasText: /^12$/ }).first();
 await twelve.click();
-const palmMute = page.locator('.tp-artbtn[title="Palm mute"]');
+const palmMute = page.locator('.tp-artbtn[aria-label="Palm mute"]');
 await palmMute.click();
 await page.waitForTimeout(100);
 check('palm mute label renders', (await svg.locator('text', { hasText: /PM/ }).count()) >= 1);
@@ -85,7 +85,7 @@ await page.waitForTimeout(100);
 check('palm mute toggles off', (await svg.locator('text', { hasText: /PM/ }).count()) === 0);
 
 // bend popover with variant
-await page.locator('.tp-artbtn[title="1½"]').click();
+await page.locator('.tp-artbtn[aria-label="1½"]').click();
 await page.waitForTimeout(100);
 check('bend 1½ applies (one-click, no popover)', (await svg.locator('text', { hasText: /^1½$/ }).count()) >= 1);
 
@@ -101,7 +101,7 @@ check('duplicate bar adds fret copy', (await svg.locator('text', { hasText: /^12
 check('context menu closed after action', (await page.locator('.context-menu').count()) === 0);
 
 // 8. Demo scores
-await page.locator('.tb-icon[title="Feature showcase"]').click();
+await page.evaluate(() => window.__tabkit.loadShowcase());
 await page.waitForTimeout(300);
 const title = await page.locator('.sheet-title').inputValue();
 check('showcase loads', title === 'Feature Showcase', title);
@@ -129,7 +129,7 @@ const persisted = await page.locator('.sheet-title').inputValue();
 check('document persists across reload', persisted === 'Persisted Song', persisted);
 
 // 11. Marquee select + delete
-await page.locator('.tb-icon[title="Demo riff"]').click();
+await page.evaluate(() => window.__tabkit.loadDemo());
 await page.waitForTimeout(300);
 const box = await svg.boundingBox();
 await page.mouse.move(box.x + 40, box.y + 60);
@@ -164,7 +164,7 @@ const caretW = await page.evaluate(() => document.querySelector('.cursor-caret')
 check('fresh cursor box is compact (not stretched)', caretW < 75, `${Math.round(caretW)}px`);
 
 // 12c. Unpacked articulation variants apply in one click (no popover)
-await page.locator('.tb-icon[title="Demo riff"]').click();
+await page.evaluate(() => window.__tabkit.loadDemo());
 await page.waitForTimeout(200);
 await svg.locator('text', { hasText: /^5$/ }).first().click();
 await page.locator('.tp-artbtn', { hasText: 'Nat' }).click();
@@ -181,12 +181,53 @@ await page.keyboard.press('Escape');
 await page.waitForTimeout(120);
 check('Escape closes the context menu', (await page.locator('.context-menu').count()) === 0);
 
+// 12e. Articulation keyboard shortcuts (fresh doc, one note)
+await page.evaluate(() => window.__tabkit.loadNew());
+await page.waitForTimeout(150);
+await page.locator('body').click({ position: { x: 10, y: 10 } });
+await page.keyboard.press('7');
+await page.waitForTimeout(80);
+await page.keyboard.press('h');
+await page.waitForTimeout(80);
+check('key h applies hammer-on', (await svg.locator('text', { hasText: /^h$/ }).count()) >= 1);
+await page.keyboard.press('b');
+await page.waitForTimeout(80);
+check('key b applies bend (full)', (await svg.locator('text', { hasText: /^full$/ }).count()) >= 1);
+await page.keyboard.press('Shift+B');
+await page.waitForTimeout(80);
+check('Shift+B cycles bend to 1½', (await svg.locator('text', { hasText: /^1½$/ }).count()) >= 1);
+await page.keyboard.press('x');
+await page.waitForTimeout(80);
+check('key x makes a dead note (x notehead)', (await svg.locator('text', { hasText: /^x$/ }).count()) >= 1);
+
 // 13. Export produces a download
 const [download] = await Promise.all([
   page.waitForEvent('download', { timeout: 5000 }),
   page.locator('.tb-icon[title^="Export"]').click(),
 ]);
 check('export downloads a file', download.suggestedFilename().endsWith('.tabkit.json'), download.suggestedFilename());
+
+// 14. Shortcuts dialog: shows on fresh load, help button reopens, dismissal persists
+await page.evaluate(() => localStorage.removeItem('tabkit.shortcuts-dismissed.v0'));
+await page.reload({ waitUntil: 'networkidle' });
+await page.waitForTimeout(300);
+check('shortcuts dialog shows on fresh load', (await page.locator('.sc-dialog').count()) === 1);
+await page.locator('.sc-ok').click();
+await page.waitForTimeout(100);
+check('dialog closes on Got it', (await page.locator('.sc-dialog').count()) === 0);
+await page.reload({ waitUntil: 'networkidle' });
+await page.waitForTimeout(300);
+check('dialog reappears when not dismissed', (await page.locator('.sc-dialog').count()) === 1);
+await page.locator('.sc-dontshow input').check();
+await page.locator('.sc-ok').click();
+await page.waitForTimeout(100);
+await page.reload({ waitUntil: 'networkidle' });
+await page.waitForTimeout(300);
+check('dialog stays dismissed after dont-show-again', (await page.locator('.sc-dialog').count()) === 0);
+await page.locator('.tb-icon[title="Keyboard shortcuts"]').click();
+await page.waitForTimeout(100);
+check('help button reopens the dialog', (await page.locator('.sc-dialog').count()) === 1);
+await page.locator('.sc-ok').click();
 
 check('no console/page errors', errors.length === 0, errors.slice(0, 3).join(' | '));
 

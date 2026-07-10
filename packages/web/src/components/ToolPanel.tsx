@@ -14,6 +14,7 @@ import {
   type TimeSignature,
 } from '@tabkit/core';
 import { bendLabel } from '@tabkit/render';
+import { articulationKeyHint } from '../hooks/useTabKeyboard';
 import { ARTICULATION_GROUPS } from '../lib/articulations';
 import { BRUSH_LADDER, brushLabel, sameBrush } from '../lib/durationBrush';
 import { TIME_SIGNATURE_PRESETS, timeSignatureLabel } from '../lib/timeSignatures';
@@ -204,12 +205,17 @@ export function ToolPanel(props: ToolPanelProps): JSX.Element {
               {groupEntries(group).map((a) => {
                 const caption = articulationCaption(a);
                 const active = isActive(a);
+                const key = articulationKeyHint(a.type);
+                const variantType = a.type === 'bend' || a.type === 'slide' || a.type === 'harmonic';
+                const title = key
+                  ? `${caption} · key ${key}${variantType ? ` (⇧${key.toUpperCase()} cycles)` : ''}`
+                  : caption;
                 return (
                   <button
                     key={`${a.type}-${caption}`}
                     type="button"
                     className={`tp-artbtn${active ? ' active' : ''}`}
-                    title={caption}
+                    title={title}
                     aria-label={caption}
                     aria-pressed={active}
                     disabled={!canArticulate}
