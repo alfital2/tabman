@@ -62,8 +62,16 @@ export function resolveGesture(input: GestureInput): GestureResult {
 
   if (!input.startCell || !input.endCell) return { kind: 'none' };
 
+  // A drag that lands in a DIFFERENT BAR is always a move-in-time — never a
+  // re-string. Reaching to a bar on another wrapped row reads as mostly
+  // vertical on screen, so the axis heuristic alone would misclassify it.
+  if (input.endCell.bar !== input.startCell.bar) {
+    return { kind: 'moveToSlot', from: input.startCell, target: input.endCell };
+  }
+
+  // Within the same bar, the axis decides: vertical re-strings, horizontal
+  // repositions in time.
   if (Math.abs(dy) >= Math.abs(dx)) {
-    // Vertical: re-string.
     if (input.mode === 'single') {
       if (input.endCell.string === input.startCell.string) return { kind: 'pick', cell: input.startCell };
       return { kind: 'moveNote', from: input.startCell, toString: input.endCell.string };
@@ -72,9 +80,9 @@ export function resolveGesture(input: GestureInput): GestureResult {
     return delta === 0 ? { kind: 'none' } : { kind: 'moveSelection', delta };
   }
 
-  // Horizontal: reposition in time onto the slot under the pointer. A drag that
-  // ends on the note's own slot is just a pick, not a silent no-op.
-  if (input.endCell.bar === input.startCell.bar && input.endCell.beat === input.startCell.beat) {
+  // Horizontal within the bar: a drag that ends on the note's own slot is just
+  // a pick, otherwise reposition onto the slot under the pointer.
+  if (input.endCell.beat === input.startCell.beat) {
     return { kind: 'pick', cell: input.startCell };
   }
   return { kind: 'moveToSlot', from: input.startCell, target: input.endCell };

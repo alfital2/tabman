@@ -82,6 +82,19 @@ describe('resolveGesture', () => {
     expect(withinBar).toEqual({ kind: 'moveToSlot', from: cell(0, 0, 1), target: cell(0, 2, 1) });
   });
 
+  it('a cross-bar drag is a move-in-time even when mostly vertical (another wrapped row)', () => {
+    // selection in bar 5, dragged UP to bar 0 on the row above: dy >> dx, but
+    // it must move the notes to bar 0, not try to re-string them in place.
+    const group = resolveGesture(
+      input({ mode: 'group', startCell: cell(5, 2, 4), endCell: cell(0, 1, 2), end: { x: 5, y: -120 } }),
+    );
+    expect(group).toEqual({ kind: 'moveToSlot', from: cell(5, 2, 4), target: cell(0, 1, 2) });
+    const single = resolveGesture(
+      input({ mode: 'single', startCell: cell(5, 0, 0), endCell: cell(0, 0, 0), end: { x: 2, y: -140 } }),
+    );
+    expect(single).toEqual({ kind: 'moveToSlot', from: cell(5, 0, 0), target: cell(0, 0, 0) });
+  });
+
   it('drags ending off the sheet resolve to none (except marquee)', () => {
     expect(
       resolveGesture(input({ mode: 'single', startCell: cell(0, 0, 0), endCell: null, end: { x: 0, y: 50 } })),

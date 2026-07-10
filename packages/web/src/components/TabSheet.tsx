@@ -293,8 +293,9 @@ export function TabSheet(props: TabSheetProps): JSX.Element {
   if (drag && drag.endCell && (Math.abs(drag.end.x - drag.start.x) > CLICK_SLOP || Math.abs(drag.end.y - drag.start.y) > CLICK_SLOP)) {
     const dx = Math.abs(drag.end.x - drag.start.x);
     const dy = Math.abs(drag.end.y - drag.start.y);
-    const horizontal = dx > dy;
-    if (drag.mode !== 'marquee' && drag.startCell && horizontal) {
+    // Match resolveGesture: a cross-bar drag (incl. another row) is a time move.
+    const crossBar = drag.startCell !== null && drag.endCell.bar !== drag.startCell.bar;
+    if (drag.mode !== 'marquee' && drag.startCell && (crossBar || dx > dy)) {
       // Reposition-in-time preview: tint the consecutive slots the notes land
       // on (a group spreads across one slot per distinct source beat).
       const movingCells = drag.mode === 'group' ? selection : [drag.startCell];
