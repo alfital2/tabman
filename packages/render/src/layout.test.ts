@@ -193,3 +193,43 @@ describe('layoutScore', () => {
     expect(bendLabel(2)).toBe('2');
   });
 });
+
+describe('tuplet marks', () => {
+  const tripletDuration = createDuration(8, { tuplet: { actual: 3, normal: 2 } });
+
+  it('draws one numeral under a contiguous triplet group', () => {
+    const score = scoreWithBeats([
+      createBeat(tripletDuration, [createNote(0, 5)]),
+      createBeat(tripletDuration, [createNote(0, 6)]),
+      createBeat(tripletDuration, [createNote(0, 7)]),
+      createBeat(QUARTER, [createNote(0, 8)]),
+    ]);
+    const layout = layoutScore(score);
+    const numerals = layout.primitives.filter(
+      (p): p is TextPrimitive => p.kind === 'text' && p.role === 'tuplet',
+    );
+    expect(numerals).toHaveLength(1);
+    expect(numerals[0]!.text).toBe('3');
+  });
+
+  it('draws separate numerals for separate groups', () => {
+    const quintuplet = createDuration(16, { tuplet: { actual: 5, normal: 4 } });
+    const score = scoreWithBeats([
+      createBeat(tripletDuration, [createNote(0, 5)]),
+      createBeat(tripletDuration, [createNote(0, 5)]),
+      createBeat(tripletDuration, [createNote(0, 5)]),
+      ...Array.from({ length: 5 }, () => createBeat(quintuplet, [createNote(0, 3)])),
+    ]);
+    const layout = layoutScore(score);
+    const numerals = layout.primitives
+      .filter((p): p is TextPrimitive => p.kind === 'text' && p.role === 'tuplet')
+      .map((p) => p.text);
+    expect(numerals).toEqual(['3', '5']);
+  });
+
+  it('draws no numeral for plain beats', () => {
+    const score = scoreWithBeats([createBeat(QUARTER, [createNote(0, 5)])]);
+    const layout = layoutScore(score);
+    expect(layout.primitives.some((p) => p.kind === 'text' && p.role === 'tuplet')).toBe(false);
+  });
+});

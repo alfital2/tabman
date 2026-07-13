@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createDuration, durationEquals, durationToWholes, EIGHTH, QUARTER, SIXTY_FOURTH, WHOLE } from './duration';
+import { createDuration, durationEquals, durationFromWholes, durationToWholes, EIGHTH, QUARTER, SIXTY_FOURTH, WHOLE } from './duration';
 import { fraction, fractionEquals } from './fraction';
 
 describe('duration', () => {
@@ -43,5 +43,25 @@ describe('duration', () => {
         createDuration(4, { tuplet: { actual: 3, normal: 2 } }),
       ),
     ).toBe(true);
+  });
+});
+
+describe('durationFromWholes', () => {
+  it('expresses plain powers of two', () => {
+    expect(durationEquals(durationFromWholes(fraction(1, 4))!, QUARTER)).toBe(true);
+    expect(durationEquals(durationFromWholes(fraction(1, 1))!, WHOLE)).toBe(true);
+    expect(durationEquals(durationFromWholes(fraction(1, 64))!, SIXTY_FOURTH)).toBe(true);
+  });
+
+  it('expresses dotted values', () => {
+    expect(durationEquals(durationFromWholes(fraction(3, 8))!, createDuration(4, { dots: 1 }))).toBe(true);
+    expect(durationEquals(durationFromWholes(fraction(7, 16))!, createDuration(4, { dots: 2 }))).toBe(true);
+  });
+
+  it('returns null for durations with no value+dots spelling', () => {
+    expect(durationFromWholes(fraction(1, 3))).toBeNull();
+    expect(durationFromWholes(fraction(5, 8))).toBeNull();
+    expect(durationFromWholes(fraction(0, 1))).toBeNull();
+    expect(durationFromWholes(fraction(3, 1))).toBeNull();
   });
 });

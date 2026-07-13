@@ -16,6 +16,7 @@ import {
 import { bendLabel } from '@tabkit/render';
 import { ARTICULATION_GROUPS } from '../lib/articulations';
 import { keyForAction, type Keymap } from '../lib/keymap';
+import { beatAt, TUPLET_COUNTS } from '@tabkit/core';
 import { BRUSH_LADDER, brushLabel, sameBrush } from '../lib/durationBrush';
 import { TIME_SIGNATURE_PRESETS, timeSignatureLabel } from '../lib/timeSignatures';
 import {
@@ -32,7 +33,7 @@ import {
   VibratoIcon,
 } from './icons';
 
-const BRUSH_ROW = BRUSH_LADDER.slice(0, 5); // whole … 16th
+const BRUSH_ROW = BRUSH_LADDER; // whole … 64th
 
 export interface ToolPanelProps {
   state: EditorState;
@@ -40,6 +41,12 @@ export interface ToolPanelProps {
   brush: Duration;
   keymap: Keymap;
   onBrush(duration: Duration): void;
+  /** Set the dot count on the brush + targeted beats (0 clears). */
+  onDots(dots: 0 | 1 | 2): void;
+  /** Split targeted beat(s) into an n-tuplet. */
+  onTuplet(actual: number): void;
+  /** Dissolve the tuplet group under the target(s). */
+  onRemoveTuplet(): void;
   onScoreTimeSignature(ts: TimeSignature): void;
   onToggleArticulation(articulation: Articulation): void;
 }
@@ -147,6 +154,12 @@ export function ToolPanel(props: ToolPanelProps): JSX.Element {
       return existing !== undefined && articulationsEqual(existing, a);
     });
 
+  // Anchor beat for dot/tuplet button states: first selected beat, else cursor.
+  const anchorCell = targetCells[0]!;
+  const anchorBeat = beatAt(state.score, anchorCell.bar, anchorCell.beat);
+  const activeDots = anchorBeat?.duration.dots ?? brush.dots;
+  const activeTuplet = anchorBeat?.duration.tuplet ?? null;
+
   const scoreTs = state.score.tracks[0]?.bars[0]?.timeSignature;
   const uniformTs =
     scoreTs !== undefined && state.score.tracks[0]!.bars.every((b) => timeSignatureEquals(b.timeSignature, scoreTs))
@@ -175,6 +188,54 @@ export function ToolPanel(props: ToolPanelProps): JSX.Element {
               </button>
             );
           })}
+          {([1, 2] as const).map((dots) => (
+            <button
+              key={`dot${dots}`}
+              type="button"
+              className={`tb-icon tp-dot${activeDots === dots ? ' active' : ''}`}
+              title={`${dots === 1 ? 'Dotted' : 'Double-dotted'} (· cycles)`}
+              aria-label={dots === 1 ? 'Dotted' : 'Double dotted'}
+              aria-pressed={activeDots === dots}
+              onClick={() => {
+                props.onDots(activeDots === dots ? 0 : dots);
+              }}
+            >
+              {dots === 1 ? '·' : '··'}
+            </button>
+          ))}
+        </div>
+      </section>
+
+      <section className="tp-section">
+        <h3>Tuplets</h3>
+        <div className="tp-grid">
+          {TUPLET_COUNTS.map((n) => (
+            <button
+              key={n}
+              type="button"
+              className={`tb-icon tp-tuplet${activeTuplet?.actual === n ? ' active' : ''}`}
+              title={`${String(n)}-tuplet · Ctrl+${String(n)}`}
+              aria-label={`${String(n)}-tuplet`}
+              disabled={anchorBeat === undefined}
+              onClick={() => {
+                props.onTuplet(n);
+              }}
+            >
+              {n}
+            </button>
+          ))}
+          <button
+            type="button"
+            className="tb-icon tp-tuplet"
+            title="Remove tuplet · Ctrl+1"
+            aria-label="Remove tuplet"
+            disabled={activeTuplet === null}
+            onClick={() => {
+              props.onRemoveTuplet();
+            }}
+          >
+            ✕
+          </button>
         </div>
       </section>
 

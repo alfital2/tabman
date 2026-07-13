@@ -471,6 +471,49 @@ export function layoutScore(score: Score, metrics: Metrics = DEFAULT_METRICS, op
       }
       flushRun();
 
+      // Tuplet numerals: one per contiguous group sharing the same ratio
+      // (rests included), bracketed under the rhythm rail.
+      {
+        const beatCx = (i: number) => contentX + i * slotWidth + slotWidth / 2;
+        let g = 0;
+        while (g < barBeats.length) {
+          const t = barBeats[g]!.duration.tuplet;
+          if (!t) {
+            g += 1;
+            continue;
+          }
+          let end = g;
+          while (
+            end + 1 < barBeats.length &&
+            barBeats[end + 1]!.duration.tuplet?.actual === t.actual &&
+            barBeats[end + 1]!.duration.tuplet?.normal === t.normal
+          ) {
+            end += 1;
+          }
+          const x1 = beatCx(g) - slotWidth * 0.25;
+          const x2 = beatCx(end) + slotWidth * 0.25;
+          const midX = (x1 + x2) / 2;
+          const y = railY + 6.5;
+          const label = String(t.actual);
+          const gap = 4 + label.length * 2.5;
+          primitives.push({ kind: 'line', role: 'tupletBracket', x1, y1: y, x2: midX - gap, y2: y });
+          primitives.push({ kind: 'line', role: 'tupletBracket', x1: midX + gap, y1: y, x2, y2: y });
+          primitives.push({ kind: 'line', role: 'tupletBracket', x1, y1: y, x2: x1, y2: y - 3 });
+          primitives.push({ kind: 'line', role: 'tupletBracket', x1: x2, y1: y, x2, y2: y - 3 });
+          primitives.push({
+            kind: 'text',
+            role: 'tuplet',
+            x: midX,
+            y: y + 2.5,
+            text: label,
+            fontSize: 8.5,
+            anchor: 'middle',
+            baseline: 'middle',
+          });
+          g = end + 1;
+        }
+      }
+
       if (placed.hasAppendSlot) {
         const cx = contentX + barBeats.length * slotWidth + slotWidth / 2;
         slotBoxes.push({

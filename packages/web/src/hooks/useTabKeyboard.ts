@@ -21,6 +21,10 @@ export interface TabKeyboardHandlers {
   onRhythmValue(value: NoteValue): void;
   /** Cycle dots 0 → 1 → 2 → 0 on the brush + targeted beats. */
   onToggleDot(): void;
+  /** Ctrl+2..9: split the targeted beat(s) into an n-tuplet. */
+  onTuplet(actual: number): void;
+  /** Ctrl+1: dissolve the tuplet group under the target(s). */
+  onRemoveTuplet(): void;
 }
 
 function isEditableTarget(target: EventTarget | null): boolean {
@@ -50,6 +54,14 @@ export function useTabKeyboard(handlers: TabKeyboardHandlers, keymap: Keymap): v
 
       if (mod) {
         const key = event.key.toLowerCase();
+        // Real Ctrl only — Cmd+digit is browser tab switching.
+        if (event.ctrlKey && !event.metaKey && key >= '1' && key <= '9') {
+          event.preventDefault();
+          const n = Number(key);
+          if (n === 1) h.onRemoveTuplet();
+          else h.onTuplet(n);
+          return;
+        }
         if (key === 'z') {
           event.preventDefault();
           if (event.shiftKey) h.onRedo();

@@ -37,6 +37,8 @@ import {
   setScoreTimeSignature,
   slide,
   SLIDE_STYLES,
+  splitBeatToTuplet,
+  removeTupletAtBeats,
   toggleArticulation,
   undo,
   updateBeatsDuration,
@@ -347,6 +349,16 @@ export function App(): JSX.Element {
       setBrush((prev) => createDuration(prev.value, { dots, tuplet: prev.tuplet }));
       apply(updateBeatsDuration(current, targets, (d) => createDuration(d.value, { dots, tuplet: d.tuplet })));
     },
+    onTuplet: (actual) => {
+      const current = stateRef.current;
+      const targets = selectionRef.current.length > 0 ? selectionRef.current : [current.cursor];
+      apply(splitBeatToTuplet(current, targets, actual));
+    },
+    onRemoveTuplet: () => {
+      const current = stateRef.current;
+      const targets = selectionRef.current.length > 0 ? selectionRef.current : [current.cursor];
+      apply(removeTupletAtBeats(current, targets));
+    },
   }, keymap);
 
   const onToggleArticulation = useCallback(
@@ -583,6 +595,22 @@ export function App(): JSX.Element {
           brush={brush}
           keymap={keymap}
           onBrush={onBrushPick}
+          onDots={(dots) => {
+            const current = stateRef.current;
+            const targets = selectionRef.current.length > 0 ? selectionRef.current : [current.cursor];
+            setBrush((prev) => createDuration(prev.value, { dots, tuplet: prev.tuplet }));
+            apply(updateBeatsDuration(current, targets, (d) => createDuration(d.value, { dots, tuplet: d.tuplet })));
+          }}
+          onTuplet={(actual) => {
+            const current = stateRef.current;
+            const targets = selectionRef.current.length > 0 ? selectionRef.current : [current.cursor];
+            apply(splitBeatToTuplet(current, targets, actual));
+          }}
+          onRemoveTuplet={() => {
+            const current = stateRef.current;
+            const targets = selectionRef.current.length > 0 ? selectionRef.current : [current.cursor];
+            apply(removeTupletAtBeats(current, targets));
+          }}
           onScoreTimeSignature={(ts) => {
             apply(setScoreTimeSignature(stateRef.current, ts));
             clearSelection();

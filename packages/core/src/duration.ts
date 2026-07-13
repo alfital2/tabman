@@ -66,6 +66,19 @@ export function durationToWholes(d: Duration): Fraction {
   return wholes;
 }
 
+/**
+ * Spell a whole-note fraction as a plain value + dots (no tuplet), or null
+ * when no such spelling exists. Reduced fractions make this a lookup: a
+ * numerator of 1/3/7 maps to 0/1/2 dots.
+ */
+export function durationFromWholes(wholes: Fraction): Duration | null {
+  const dots = wholes.numerator === 1 ? 0 : wholes.numerator === 3 ? 1 : wholes.numerator === 7 ? 2 : null;
+  if (dots === null) return null;
+  const value = wholes.denominator / 2 ** dots;
+  if (!NOTE_VALUES.includes(value as NoteValue)) return null;
+  return createDuration(value as NoteValue, { dots });
+}
+
 export function durationEquals(a: Duration, b: Duration): boolean {
   return (
     a.value === b.value &&

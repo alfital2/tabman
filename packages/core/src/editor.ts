@@ -1,6 +1,6 @@
 import { articulationsEqual, getArticulation, withArticulation, withoutArticulationType, type Articulation } from './articulation';
-import { durationEquals, durationToWholes, QUARTER, type Duration } from './duration';
-import { addFractions, compareFractions, subtractFractions, ZERO, type Fraction } from './fraction';
+import { createDuration, durationEquals, durationFromWholes, durationToWholes, QUARTER, type Duration, type Tuplet } from './duration';
+import { addFractions, compareFractions, fraction, multiplyFractions, subtractFractions, ZERO, type Fraction } from './fraction';
 import { restringFret, MAX_FRET } from './pitch';
 import { barCapacityInWholes, timeSignatureEquals, FOUR_FOUR, type TimeSignature } from './timeSignature';
 import {
@@ -270,6 +270,124 @@ export function updateBeatsDuration(
       bar,
       voiceBeats(newBars[barIndex]!).map((bt, j) => (j === beatIndex ? createBeat(duration, bt.notes) : bt)),
     );
+  }
+  if (!changed) return state;
+  return commit(state, withBars(state.score, newBars));
+}
+
+// ---------------------------------------------------------------------------
+// Tuplets
+
+/** Supported tuplet counts → their "in the time of" denominators. */
+export const TUPLET_NORMALS: Readonly<Record<number, number>> = Object.freeze({
+  2: 3,
+  3: 2,
+  4: 3,
+  5: 4,
+  6: 4,
+  7: 4,
+  9: 8,
+});
+
+export const TUPLET_COUNTS: readonly number[] = Object.freeze(
+  Object.keys(TUPLET_NORMALS).map(Number).sort((a, b) => a - b),
+);
+
+/**
+ * MuseScore-style split: each targeted beat of total length S becomes
+ * `actual` slots written as S/normal (so the group still sums to S), tagged
+ * {actual, normal}. Notes stay on the first slot; the rest are rests. Beats
+ * already in a tuplet, and lengths with no plain spelling, are skipped.
+ */
+export function splitBeatToTuplet(state: EditorState, cells: readonly Cell[], actual: number): EditorState {
+  const normal = TUPLET_NORMALS[actual];
+  if (normal === undefined) return state;
+  const tuplet: Tuplet = { actual, normal };
+
+  // Reverse order keeps earlier target indices valid while beats are spliced in.
+  const targets = uniqueBeatRefs(cells).reverse();
+  const bars = track0(state.score).bars;
+  const newBars = [...bars];
+  let changed = false;
+  for (const { bar: barIndex, beat: beatIndex } of targets) {
+    const bar = newBars[barIndex];
+    if (!bar) continue;
+    const beats = voiceBeats(bar);
+    const beat = beats[beatIndex];
+    if (!beat || beat.duration.tuplet !== null) continue;
+    const written = durationFromWholes(multiplyFractions(durationToWholes(beat.duration), fraction(1, normal)));
+    if (!written) continue;
+    const slotDuration = createDuration(written.value, { dots: written.dots, tuplet });
+    const slots = [
+      createBeat(slotDuration, beat.notes),
+      ...Array.from({ length: actual - 1 }, () => createBeat(slotDuration, [])),
+    ];
+    changed = true;
+    newBars[barIndex] = withVoiceBeats(bar, [...beats.slice(0, beatIndex), ...slots, ...beats.slice(beatIndex + 1)]);
+  }
+  if (!changed) return state;
+  return commit(state, withBars(state.score, newBars));
+}
+
+/** The contiguous run of beats around `index` sharing this exact tuplet. */
+function tupletRun(beats: readonly Beat[], index: number): { start: number; end: number } {
+  const t = beats[index]!.duration.tuplet!;
+  const same = (b: Beat | undefined) =>
+    b?.duration.tuplet !== null &&
+    b?.duration.tuplet?.actual === t.actual &&
+    b?.duration.tuplet?.normal === t.normal;
+  let start = index;
+  while (start > 0 && same(beats[start - 1])) start -= 1;
+  let end = index;
+  while (end < beats.length - 1 && same(beats[end + 1])) end += 1;
+  return { start, end };
+}
+
+/**
+ * Undo a tuplet. A complete group (run length == actual, total spellable)
+ * collapses back to one base beat keeping the first slot's notes; anything
+ * else just gets its tuplet flags stripped.
+ */
+export function removeTupletAtBeats(state: EditorState, cells: readonly Cell[]): EditorState {
+  const bars = track0(state.score).bars;
+  const newBars = [...bars];
+  let changed = false;
+
+  // Collect one run per targeted tuplet group, then rewrite bars in reverse
+  // start order so earlier run indices stay valid.
+  const runsByBar = new Map<number, Array<{ start: number; end: number }>>();
+  for (const { bar: barIndex, beat: beatIndex } of uniqueBeatRefs(cells)) {
+    const bar = newBars[barIndex];
+    if (!bar) continue;
+    const beats = voiceBeats(bar);
+    const beat = beats[beatIndex];
+    if (!beat || beat.duration.tuplet === null) continue;
+    const run = tupletRun(beats, beatIndex);
+    const runs = runsByBar.get(barIndex) ?? [];
+    if (!runs.some((r) => r.start === run.start)) runs.push(run);
+    runsByBar.set(barIndex, runs);
+  }
+
+  for (const [barIndex, runs] of runsByBar) {
+    runs.sort((a, b) => b.start - a.start);
+    for (const run of runs) {
+      const bar = newBars[barIndex]!;
+      const beats = voiceBeats(bar);
+      const group = beats.slice(run.start, run.end + 1);
+      const actual = group[0]!.duration.tuplet!.actual;
+      const total = group.reduce((sum, b) => addFractions(sum, beatDurationInWholes(b)), ZERO);
+      const merged = durationFromWholes(total);
+      changed = true;
+      const replacement =
+        group.length === actual && merged
+          ? [createBeat(merged, group[0]!.notes)]
+          : group.map((b) => createBeat(createDuration(b.duration.value, { dots: b.duration.dots }), b.notes));
+      newBars[barIndex] = withVoiceBeats(bar, [
+        ...beats.slice(0, run.start),
+        ...replacement,
+        ...beats.slice(run.end + 1),
+      ]);
+    }
   }
   if (!changed) return state;
   return commit(state, withBars(state.score, newBars));

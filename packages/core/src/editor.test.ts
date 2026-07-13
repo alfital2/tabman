@@ -29,13 +29,16 @@ import {
   setDurationAtCursor,
   setScoreMeta,
   setScoreTimeSignature,
+  removeTupletAtBeats,
+  splitBeatToTuplet,
   toggleArticulation,
   undo,
   updateBeatsDuration,
   type EditorState,
 } from './editor';
-import { createDefaultScore, createScore, createTrack, createBar, isRest } from './model';
+import { barFilledInWholes, createDefaultScore, createScore, createTrack, createBar, isRest } from './model';
 import { createTimeSignature, FOUR_FOUR } from './timeSignature';
+import { fractionEquals } from './fraction';
 
 function emptyEditor(): EditorState {
   return createEditor(createDefaultScore());
@@ -620,5 +623,119 @@ describe('updateBeatsDuration', () => {
     state = updateBeatsDuration(state, [{ bar: 0, beat: 0, string: 0 }], () => WHOLE);
     state = undo(state);
     expect(beatAt(state.score, 0, 0)!.duration.value).toBe(4);
+  });
+});
+
+describe('splitBeatToTuplet', () => {
+  function editorWithQuarterNote(): EditorState {
+    let state = emptyEditor();
+    state = setFretAtCursor(state, 5, QUARTER);
+    return state;
+  }
+
+  it('splits a quarter into a triplet of tuplet-8ths, notes on the first slot', () => {
+    let state = editorWithQuarterNote();
+    state = splitBeatToTuplet(state, [{ bar: 0, beat: 0, string: 0 }], 3);
+    const beats = [0, 1, 2].map((i) => beatAt(state.score, 0, i)!);
+    for (const b of beats) {
+      expect(b.duration.value).toBe(8);
+      expect(b.duration.tuplet).toEqual({ actual: 3, normal: 2 });
+    }
+    expect(beats[0]!.notes.map((n) => n.fret)).toEqual([5]);
+    expect(isRest(beats[1]!)).toBe(true);
+    expect(isRest(beats[2]!)).toBe(true);
+  });
+
+  it('keeps the bar total unchanged', () => {
+    let state = editorWithQuarterNote();
+    const before = barFilledInWholes(state.score.tracks[0]!.bars[0]!);
+    state = splitBeatToTuplet(state, [{ bar: 0, beat: 0, string: 0 }], 5);
+    const after = barFilledInWholes(state.score.tracks[0]!.bars[0]!);
+    expect(fractionEquals(before, after)).toBe(true);
+  });
+
+  it('splits a quintuplet into 16ths at 5:4', () => {
+    let state = editorWithQuarterNote();
+    state = splitBeatToTuplet(state, [{ bar: 0, beat: 0, string: 0 }], 5);
+    const first = beatAt(state.score, 0, 0)!;
+    expect(first.duration.value).toBe(16);
+    expect(first.duration.tuplet).toEqual({ actual: 5, normal: 4 });
+    expect(beatAt(state.score, 0, 4)).toBeDefined();
+  });
+
+  it('splits a dotted quarter into a duplet of plain 8ths at 2:3', () => {
+    let state = emptyEditor();
+    state = setFretAtCursor(state, 5, createDuration(4, { dots: 1 }));
+    state = splitBeatToTuplet(state, [{ bar: 0, beat: 0, string: 0 }], 2);
+    const first = beatAt(state.score, 0, 0)!;
+    expect(first.duration.value).toBe(8);
+    expect(first.duration.dots).toBe(0);
+    expect(first.duration.tuplet).toEqual({ actual: 2, normal: 3 });
+  });
+
+  it('splits a dotted quarter quadruplet into plain 8ths at 4:3', () => {
+    let state = emptyEditor();
+    state = setFretAtCursor(state, 5, createDuration(4, { dots: 1 }));
+    state = splitBeatToTuplet(state, [{ bar: 0, beat: 0, string: 0 }], 4);
+    const first = beatAt(state.score, 0, 0)!;
+    expect(first.duration.value).toBe(8);
+    expect(first.duration.tuplet).toEqual({ actual: 4, normal: 3 });
+  });
+
+  it('is a no-op on a beat already inside a tuplet', () => {
+    let state = editorWithQuarterNote();
+    state = splitBeatToTuplet(state, [{ bar: 0, beat: 0, string: 0 }], 3);
+    expect(splitBeatToTuplet(state, [{ bar: 0, beat: 0, string: 0 }], 3)).toBe(state);
+  });
+
+  it('is a no-op for unsupported counts', () => {
+    const state = editorWithQuarterNote();
+    expect(splitBeatToTuplet(state, [{ bar: 0, beat: 0, string: 0 }], 8)).toBe(state);
+    expect(splitBeatToTuplet(state, [{ bar: 0, beat: 0, string: 0 }], 1)).toBe(state);
+  });
+
+  it('is undoable in one step', () => {
+    let state = editorWithQuarterNote();
+    state = splitBeatToTuplet(state, [{ bar: 0, beat: 0, string: 0 }], 3);
+    state = undo(state);
+    expect(beatAt(state.score, 0, 0)!.duration.value).toBe(4);
+    expect(beatAt(state.score, 0, 1)).toBeUndefined();
+  });
+});
+
+describe('removeTupletAtBeats', () => {
+  function tripletEditor(): EditorState {
+    let state = emptyEditor();
+    state = setFretAtCursor(state, 5, QUARTER);
+    return splitBeatToTuplet(state, [{ bar: 0, beat: 0, string: 0 }], 3);
+  }
+
+  it('collapses a complete group back to the base value, keeping first-slot notes', () => {
+    let state = tripletEditor();
+    state = removeTupletAtBeats(state, [{ bar: 0, beat: 1, string: 0 }]);
+    const first = beatAt(state.score, 0, 0)!;
+    expect(first.duration.value).toBe(4);
+    expect(first.duration.tuplet).toBeNull();
+    expect(first.notes.map((n) => n.fret)).toEqual([5]);
+    expect(beatAt(state.score, 0, 1)).toBeUndefined();
+  });
+
+  it('strips tuplet flags from an incomplete group', () => {
+    let state = tripletEditor();
+    // Delete the middle slot (a rest) so only 2 of 3 remain.
+    state = placeCursor(state, { bar: 0, beat: 1, string: 0 });
+    state = clearAtCursor(state);
+    state = removeTupletAtBeats(state, [{ bar: 0, beat: 0, string: 0 }]);
+    const first = beatAt(state.score, 0, 0)!;
+    const second = beatAt(state.score, 0, 1)!;
+    expect(first.duration.tuplet).toBeNull();
+    expect(first.duration.value).toBe(8);
+    expect(second.duration.tuplet).toBeNull();
+  });
+
+  it('is a no-op on a non-tuplet beat', () => {
+    let state = emptyEditor();
+    state = setFretAtCursor(state, 5, QUARTER);
+    expect(removeTupletAtBeats(state, [{ bar: 0, beat: 0, string: 0 }])).toBe(state);
   });
 });

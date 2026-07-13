@@ -71,6 +71,8 @@ export function lineStyle(theme: Theme, role: LineRole): LineStyle {
       return { stroke: theme.beam, strokeWidth: 1.8 };
     case 'slide':
       return { stroke: theme.slide, strokeWidth: 1 };
+    case 'tupletBracket':
+      return { stroke: theme.beam, strokeWidth: 0.8 };
   }
 }
 
@@ -88,6 +90,8 @@ export function textStyle(theme: Theme, role: TextRole): TextStyle {
       return { fill: theme.timeSignature, fontFamily: theme.serifFontFamily, fontWeight: 'bold' };
     case 'articulation':
       return { fill: theme.articulation, fontFamily: theme.monoFontFamily, fontWeight: 'normal' };
+    case 'tuplet':
+      return { fill: theme.stem, fontFamily: theme.serifFontFamily, fontWeight: 'bold' };
   }
 }
 
