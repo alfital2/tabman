@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
-import type { ArticulationType, Direction } from '@tabkit/core';
+import type { ArticulationType, Direction, NoteValue } from '@tabkit/core';
+import { actionForKey, type Keymap } from '../lib/keymap';
 
 export interface TabKeyboardHandlers {
   onDigit(digit: number): void;
@@ -16,29 +17,10 @@ export interface TabKeyboardHandlers {
   onDuplicate(): void;
   /** Apply/toggle an articulation on the targeted note(s); cycle = Shift held. */
   onArticulation(type: ArticulationType, cycle: boolean): void;
-}
-
-/** Single-letter shortcut → articulation type. Digits are fret entry, so
- * letters are free and never collide with browser (Cmd/Ctrl/Alt) shortcuts. */
-export const ARTICULATION_KEYS: Readonly<Record<string, ArticulationType>> = {
-  h: 'hammerOn',
-  p: 'pullOff',
-  s: 'slide',
-  b: 'bend',
-  v: 'vibrato',
-  m: 'palmMute',
-  r: 'letRing',
-  t: 'tap',
-  a: 'slap',
-  o: 'pop',
-  x: 'dead',
-  n: 'harmonic',
-};
-
-/** The base shortcut key for an articulation type (for tooltips). */
-export function articulationKeyHint(type: ArticulationType): string | undefined {
-  const entry = Object.entries(ARTICULATION_KEYS).find(([, t]) => t === type);
-  return entry?.[0];
+  /** Set the note value (brush + targeted beats). */
+  onRhythmValue(value: NoteValue): void;
+  /** Cycle dots 0 → 1 → 2 → 0 on the brush + targeted beats. */
+  onToggleDot(): void;
 }
 
 function isEditableTarget(target: EventTarget | null): boolean {
@@ -49,12 +31,15 @@ function isEditableTarget(target: EventTarget | null): boolean {
 
 /**
  * Global keyboard controller. Ignores keystrokes while a form field is
- * focused; reads the latest handlers through a ref so the listener binds once.
+ * focused; reads the latest handlers and keymap through refs so the listener
+ * binds once. Letter/dot keys resolve through the user-configurable keymap.
  */
-export function useTabKeyboard(handlers: TabKeyboardHandlers): void {
+export function useTabKeyboard(handlers: TabKeyboardHandlers, keymap: Keymap): void {
   const ref = useRef(handlers);
+  const keymapRef = useRef(keymap);
   useEffect(() => {
     ref.current = handlers;
+    keymapRef.current = keymap;
   });
 
   useEffect(() => {
@@ -135,10 +120,15 @@ export function useTabKeyboard(handlers: TabKeyboardHandlers): void {
         return;
       }
       if (event.key.length === 1) {
-        const type = ARTICULATION_KEYS[event.key.toLowerCase()];
-        if (type) {
-          event.preventDefault();
-          h.onArticulation(type, event.shiftKey);
+        const action = actionForKey(keymapRef.current, event.key);
+        if (!action) return;
+        event.preventDefault();
+        if (action === 'rhythm.dot') {
+          h.onToggleDot();
+        } else if (action.startsWith('rhythm.')) {
+          h.onRhythmValue(Number(action.slice('rhythm.'.length)) as NoteValue);
+        } else {
+          h.onArticulation(action.slice('articulation.'.length) as ArticulationType, event.shiftKey);
         }
       }
     };

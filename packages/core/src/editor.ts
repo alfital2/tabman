@@ -244,6 +244,15 @@ export function setDurationAtCursor(state: EditorState, duration: Duration): Edi
 
 /** Set the duration on every (bar, beat) referenced by the cells. */
 export function setBeatsDuration(state: EditorState, cells: readonly Cell[], duration: Duration): EditorState {
+  return updateBeatsDuration(state, cells, () => duration);
+}
+
+/** Rewrite each targeted beat's duration through `update` (notes preserved). */
+export function updateBeatsDuration(
+  state: EditorState,
+  cells: readonly Cell[],
+  update: (duration: Duration) => Duration,
+): EditorState {
   const targets = uniqueBeatRefs(cells);
   const bars = track0(state.score).bars;
   let changed = false;
@@ -253,11 +262,13 @@ export function setBeatsDuration(state: EditorState, cells: readonly Cell[], dur
     if (!bar) continue;
     const beats = voiceBeats(bar);
     const beat = beats[beatIndex];
-    if (!beat || durationEquals(beat.duration, duration)) continue;
+    if (!beat) continue;
+    const duration = update(beat.duration);
+    if (durationEquals(beat.duration, duration)) continue;
     changed = true;
     newBars[barIndex] = withVoiceBeats(
       bar,
-      beats.map((bt, j) => (j === beatIndex ? createBeat(duration, bt.notes) : bt)),
+      voiceBeats(newBars[barIndex]!).map((bt, j) => (j === beatIndex ? createBeat(duration, bt.notes) : bt)),
     );
   }
   if (!changed) return state;

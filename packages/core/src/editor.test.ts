@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { bend, plainArticulation } from './articulation';
-import { EIGHTH, HALF, QUARTER, WHOLE } from './duration';
+import { createDuration, EIGHTH, HALF, QUARTER, WHOLE } from './duration';
 import {
   appendBar,
   beatAt,
@@ -31,6 +31,7 @@ import {
   setScoreTimeSignature,
   toggleArticulation,
   undo,
+  updateBeatsDuration,
   type EditorState,
 } from './editor';
 import { createDefaultScore, createScore, createTrack, createBar, isRest } from './model';
@@ -575,5 +576,49 @@ describe('history', () => {
     expect(setScoreTimeSignature(state, FOUR_FOUR)).toBe(state);
     expect(deleteBar(state, 99)).toBe(state);
     expect(pasteBeatsAtCursor(state, [])).toBe(state);
+  });
+});
+
+describe('updateBeatsDuration', () => {
+  function twoNoteEditor(): EditorState {
+    let state = emptyEditor();
+    state = setFretAtCursor(state, 3, createDuration(4, { dots: 1 }));
+    state = placeCursor(state, { bar: 0, beat: 1, string: 0 });
+    state = setFretAtCursor(state, 5, EIGHTH);
+    return state;
+  }
+
+  it('maps each targeted beat duration, preserving notes', () => {
+    let state = twoNoteEditor();
+    const cells = [
+      { bar: 0, beat: 0, string: 0 },
+      { bar: 0, beat: 1, string: 0 },
+    ];
+    state = updateBeatsDuration(state, cells, (d) => createDuration(16, { dots: d.dots, tuplet: d.tuplet }));
+    const first = beatAt(state.score, 0, 0)!;
+    const second = beatAt(state.score, 0, 1)!;
+    expect(first.duration.value).toBe(16);
+    expect(first.duration.dots).toBe(1); // dot preserved through the value change
+    expect(second.duration.value).toBe(16);
+    expect(second.duration.dots).toBe(0);
+    expect(noteAt(state.score, cells[0]!)?.fret).toBe(3);
+    expect(noteAt(state.score, cells[1]!)?.fret).toBe(5);
+  });
+
+  it('returns the same state when the update changes nothing', () => {
+    const state = twoNoteEditor();
+    expect(updateBeatsDuration(state, [{ bar: 0, beat: 0, string: 0 }], (d) => d)).toBe(state);
+  });
+
+  it('ignores cells pointing at missing beats', () => {
+    const state = twoNoteEditor();
+    expect(updateBeatsDuration(state, [{ bar: 0, beat: 99, string: 0 }], () => WHOLE)).toBe(state);
+  });
+
+  it('is undoable', () => {
+    let state = twoNoteEditor();
+    state = updateBeatsDuration(state, [{ bar: 0, beat: 0, string: 0 }], () => WHOLE);
+    state = undo(state);
+    expect(beatAt(state.score, 0, 0)!.duration.value).toBe(4);
   });
 });

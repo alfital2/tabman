@@ -14,8 +14,8 @@ import {
   type TimeSignature,
 } from '@tabkit/core';
 import { bendLabel } from '@tabkit/render';
-import { articulationKeyHint } from '../hooks/useTabKeyboard';
 import { ARTICULATION_GROUPS } from '../lib/articulations';
+import { keyForAction, type Keymap } from '../lib/keymap';
 import { BRUSH_LADDER, brushLabel, sameBrush } from '../lib/durationBrush';
 import { TIME_SIGNATURE_PRESETS, timeSignatureLabel } from '../lib/timeSignatures';
 import {
@@ -38,6 +38,7 @@ export interface ToolPanelProps {
   state: EditorState;
   selection: readonly Cell[];
   brush: Duration;
+  keymap: Keymap;
   onBrush(duration: Duration): void;
   onScoreTimeSignature(ts: TimeSignature): void;
   onToggleArticulation(articulation: Articulation): void;
@@ -132,7 +133,7 @@ function groupEntries(group: (typeof ARTICULATION_GROUPS)[number]): Articulation
 }
 
 export function ToolPanel(props: ToolPanelProps): JSX.Element {
-  const { state, selection, brush } = props;
+  const { state, selection, brush, keymap } = props;
 
   const targetCells: readonly Cell[] = selection.length > 0 ? selection : [state.cursor];
   const targetNotes = targetCells
@@ -157,20 +158,23 @@ export function ToolPanel(props: ToolPanelProps): JSX.Element {
       <section className="tp-section">
         <h3>Note value</h3>
         <div className="tp-grid">
-          {BRUSH_ROW.map((duration) => (
-            <button
-              key={duration.value}
-              type="button"
-              className={`tb-icon${sameBrush(brush, duration) ? ' active' : ''}`}
-              title={brushLabel(duration)}
-              aria-label={brushLabel(duration)}
-              onClick={() => {
-                props.onBrush(duration);
-              }}
-            >
-              <NoteValueIcon value={duration.value} />
-            </button>
-          ))}
+          {BRUSH_ROW.map((duration) => {
+            const key = keyForAction(keymap, `rhythm.${duration.value}`);
+            return (
+              <button
+                key={duration.value}
+                type="button"
+                className={`tb-icon${sameBrush(brush, duration) ? ' active' : ''}`}
+                title={key === null ? brushLabel(duration) : `${brushLabel(duration)} · key ${key}`}
+                aria-label={brushLabel(duration)}
+                onClick={() => {
+                  props.onBrush(duration);
+                }}
+              >
+                <NoteValueIcon value={duration.value} />
+              </button>
+            );
+          })}
         </div>
       </section>
 
@@ -205,7 +209,7 @@ export function ToolPanel(props: ToolPanelProps): JSX.Element {
               {groupEntries(group).map((a) => {
                 const caption = articulationCaption(a);
                 const active = isActive(a);
-                const key = articulationKeyHint(a.type);
+                const key = keyForAction(keymap, `articulation.${a.type}`) ?? undefined;
                 const variantType = a.type === 'bend' || a.type === 'slide' || a.type === 'harmonic';
                 const title = key
                   ? `${caption} · key ${key}${variantType ? ` (⇧${key.toUpperCase()} cycles)` : ''}`

@@ -39,6 +39,8 @@ import {
   SLIDE_STYLES,
   toggleArticulation,
   undo,
+  updateBeatsDuration,
+  createDuration,
   QUARTER,
   type Articulation,
   type ArticulationType,
@@ -46,6 +48,7 @@ import {
   type Direction,
   type Duration,
   type EditorState,
+  type NoteValue,
   type Score,
   type ScoreMetaPatch,
   type TimeSignature,
@@ -64,6 +67,7 @@ import { clipboardBar, clipboardBeats, type ClipboardContent } from './lib/clipb
 import { demoScore, nothingElseMatters, showcaseScore } from './lib/demoScore';
 import { brushLabel, longerBrush, nudgeDuration, shorterBrush } from './lib/durationBrush';
 import { combineTypedFret, type TypedFretState } from './lib/fretEntry';
+import { loadKeymap, saveKeymap, type Keymap } from './lib/keymap';
 import {
   loadStoredScore,
   saveStoredScore,
@@ -125,6 +129,12 @@ export function App(): JSX.Element {
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [showShortcuts, setShowShortcuts] = useState<boolean>(shortcutsInitiallyOpen);
   const [chordEdit, setChordEdit] = useState<{ cell: HitCell; initial: string } | null>(null);
+  const [keymap, setKeymap] = useState<Keymap>(() => loadKeymap(typeof localStorage === 'undefined' ? null : localStorage));
+
+  // Persist keymap edits as they happen.
+  useEffect(() => {
+    saveKeymap(typeof localStorage === 'undefined' ? null : localStorage, keymap);
+  }, [keymap]);
 
   const closeShortcuts = useCallback((dontShowAgain: boolean) => {
     setShowShortcuts(false);
@@ -317,7 +327,27 @@ export function App(): JSX.Element {
       const articulation = cycle ? nextVariant(current.score, cells, type) : defaultArticulation(type);
       apply(toggleArticulation(current, cells, articulation));
     },
-  });
+    onRhythmValue: (value: NoteValue) => {
+      setBrush((prev) => createDuration(value, { dots: prev.dots, tuplet: prev.tuplet }));
+      const current = stateRef.current;
+      const selected = selectionRef.current;
+      const targets = selected.length > 0 ? selected : [current.cursor];
+      // Value replaces; dots and tuplet ride along (same rule as +/− retime).
+      apply(updateBeatsDuration(current, targets, (d) => createDuration(value, { dots: d.dots, tuplet: d.tuplet })));
+    },
+    onToggleDot: () => {
+      const current = stateRef.current;
+      const selected = selectionRef.current;
+      const targets = selected.length > 0 ? selected : [current.cursor];
+      const anchor = beatAt(current.score, targets[0]!.bar, targets[0]!.beat);
+      // All targets (and the brush) land on the same dot count: one past the
+      // anchor beat's — or the brush's own when the cursor sits on empty space.
+      const from = anchor?.duration.dots ?? brushRef.current.dots;
+      const dots = ((from + 1) % 3) as 0 | 1 | 2;
+      setBrush((prev) => createDuration(prev.value, { dots, tuplet: prev.tuplet }));
+      apply(updateBeatsDuration(current, targets, (d) => createDuration(d.value, { dots, tuplet: d.tuplet })));
+    },
+  }, keymap);
 
   const onToggleArticulation = useCallback(
     (articulation: Articulation) => {
@@ -551,6 +581,7 @@ export function App(): JSX.Element {
           state={state}
           selection={selection}
           brush={brush}
+          keymap={keymap}
           onBrush={onBrushPick}
           onScoreTimeSignature={(ts) => {
             apply(setScoreTimeSignature(stateRef.current, ts));
@@ -571,7 +602,7 @@ export function App(): JSX.Element {
         </span>
       </footer>
       {menuNode}
-      {showShortcuts && <ShortcutsDialog onClose={closeShortcuts} />}
+      {showShortcuts && <ShortcutsDialog keymap={keymap} onKeymapChange={setKeymap} onClose={closeShortcuts} />}
     </div>
   );
 }

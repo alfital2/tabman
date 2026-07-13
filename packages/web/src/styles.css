@@ -864,6 +864,64 @@ body {
   filter: brightness(1.08);
 }
 
+.sc-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.sc-reset {
+  padding: 8px 14px;
+  border-radius: 8px;
+  border: 1px solid #454b58;
+  background: #2c313a;
+  color: #cdd1da;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.sc-reset:hover {
+  background: #333945;
+}
+
+.sc-sublead {
+  margin: 0 0 6px;
+  font-size: 11.5px;
+  color: #8f95a1;
+}
+
+/* Rebindable key chip: same look as .kbd, but clickable. */
+.sc-bind {
+  cursor: pointer;
+}
+
+.sc-bind:hover {
+  border-color: #5b8bff;
+}
+
+.sc-bind.listening {
+  border-color: #3f74ff;
+  background: #24304f;
+  color: #9db8ff;
+  animation: sc-pulse 1s ease-in-out infinite;
+}
+
+.sc-bind.unbound {
+  color: #6b7280;
+  border-style: dashed;
+}
+
+.sc-error {
+  color: #ff8b7a;
+  font-size: 11.5px;
+}
+
+@keyframes sc-pulse {
+  50% {
+    box-shadow: 0 0 0 3px rgba(63, 116, 255, 0.25);
+  }
+}
+
 /* ---- chord picker ---- */
 
 .cp-dialog {
