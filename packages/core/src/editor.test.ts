@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { bend, plainArticulation } from './articulation';
+import { createBeat, createNote, createVoice } from './model';
 import { createDuration, EIGHTH, HALF, QUARTER, WHOLE } from './duration';
 import {
   appendBar,
@@ -21,6 +22,7 @@ import {
   moveNoteToString,
   noteAt,
   pasteBeatsAtCursor,
+  pasteSegmentsAtCursor,
   placeCursor,
   redo,
   setBarTimeSignature,
@@ -29,6 +31,7 @@ import {
   setDurationAtCursor,
   setScoreMeta,
   setScoreTimeSignature,
+  segmentsForCells,
   removeTupletAtBeats,
   splitBeatToTuplet,
   toggleArticulation,
@@ -737,5 +740,118 @@ describe('removeTupletAtBeats', () => {
     let state = emptyEditor();
     state = setFretAtCursor(state, 5, QUARTER);
     expect(removeTupletAtBeats(state, [{ bar: 0, beat: 0, string: 0 }])).toBe(state);
+  });
+});
+
+describe('bar segments copy/paste', () => {
+  /** 2 bars: bar0 = frets 1,2 (quarters), bar1 = frets 3,4 (quarters, 3/4 time). */
+  function twoBarEditor(): EditorState {
+    let state = createEditor(
+      createScore({
+        tracks: [
+          createTrack({
+            bars: [
+              createBar(FOUR_FOUR, [
+                createVoice([
+                  createBeat(QUARTER, [createNote(0, 1)]),
+                  createBeat(QUARTER, [createNote(1, 2)]),
+                ]),
+              ]),
+              createBar(createTimeSignature(3, 4), [
+                createVoice([
+                  createBeat(QUARTER, [createNote(0, 3)]),
+                  createBeat(QUARTER, [createNote(0, 4)]),
+                ]),
+              ]),
+            ],
+          }),
+        ],
+      }),
+    );
+    return state;
+  }
+
+  it('segmentsForCells groups selected cells per bar, keeping each bar time signature', () => {
+    const state = twoBarEditor();
+    const segments = segmentsForCells(state.score, [
+      { bar: 0, beat: 0, string: 0 },
+      { bar: 0, beat: 1, string: 1 },
+      { bar: 1, beat: 0, string: 0 },
+    ]);
+    expect(segments).toHaveLength(2);
+    expect(segments[0]!.timeSignature).toEqual({ numerator: 4, denominator: 4 });
+    expect(segments[0]!.beats).toHaveLength(2);
+    expect(segments[1]!.timeSignature).toEqual({ numerator: 3, denominator: 4 });
+    expect(segments[1]!.beats).toHaveLength(1);
+    expect(segments[1]!.beats[0]!.notes[0]!.fret).toBe(3);
+  });
+
+  it('segmentsForCells filters notes to the selected strings', () => {
+    const state = twoBarEditor();
+    const segments = segmentsForCells(state.score, [{ bar: 0, beat: 0, string: 5 }]);
+    expect(segments).toHaveLength(1);
+    expect(segments[0]!.beats[0]!.notes).toHaveLength(0); // string 5 has no note
+  });
+
+  it('paste keeps bar boundaries: later segments become their own bars after the cursor bar', () => {
+    let state = twoBarEditor();
+    const segments = segmentsForCells(state.score, [
+      { bar: 0, beat: 0, string: 0 },
+      { bar: 0, beat: 1, string: 1 },
+      { bar: 1, beat: 0, string: 0 },
+      { bar: 1, beat: 1, string: 0 },
+    ]);
+    // Paste at the append slot of the last bar.
+    state = placeCursor(state, { bar: 1, beat: 2, string: 0 });
+    state = pasteSegmentsAtCursor(state, segments);
+    const bars = state.score.tracks[0]!.bars;
+    expect(bars).toHaveLength(3);
+    // Bar 1 (3/4, already 2/4 full) takes what fits of segment 0…
+    expect(beatAt(state.score, 1, 2)!.notes[0]!.fret).toBe(1);
+    // …and the overflow cascades into the head of the next (segment) bar,
+    // which keeps its copied 3/4 time signature.
+    expect(bars[2]!.timeSignature).toEqual({ numerator: 3, denominator: 4 });
+    expect(beatAt(state.score, 2, 0)!.notes[0]!.fret).toBe(2);
+    expect(beatAt(state.score, 2, 1)!.notes[0]!.fret).toBe(3);
+    expect(beatAt(state.score, 2, 2)!.notes[0]!.fret).toBe(4);
+  });
+
+  it('paste lands the cursor at the end of the pasted region', () => {
+    let state = twoBarEditor();
+    const segments = segmentsForCells(state.score, [
+      { bar: 0, beat: 0, string: 0 },
+      { bar: 1, beat: 0, string: 0 },
+    ]);
+    state = placeCursor(state, { bar: 1, beat: 2, string: 0 });
+    state = pasteSegmentsAtCursor(state, segments);
+    expect(state.cursor.bar).toBe(2);
+  });
+
+  it('single-segment paste inserts beats like a plain beat paste', () => {
+    let state = twoBarEditor();
+    const segments = segmentsForCells(state.score, [{ bar: 1, beat: 0, string: 0 }]);
+    state = placeCursor(state, { bar: 0, beat: 0, string: 0 });
+    state = pasteSegmentsAtCursor(state, segments);
+    expect(beatAt(state.score, 0, 0)!.notes[0]!.fret).toBe(3); // inserted in front
+    expect(beatAt(state.score, 0, 1)!.notes[0]!.fret).toBe(1); // old content pushed right
+    expect(state.score.tracks[0]!.bars).toHaveLength(2);
+  });
+
+  it('multi-segment paste is one undo step', () => {
+    let state = twoBarEditor();
+    const segments = segmentsForCells(state.score, [
+      { bar: 0, beat: 0, string: 0 },
+      { bar: 1, beat: 0, string: 0 },
+    ]);
+    state = placeCursor(state, { bar: 1, beat: 2, string: 0 });
+    state = pasteSegmentsAtCursor(state, segments);
+    state = undo(state);
+    expect(state.score.tracks[0]!.bars).toHaveLength(2);
+    expect(beatAt(state.score, 1, 2)).toBeUndefined();
+  });
+
+  it('empty segment list is a no-op', () => {
+    const state = twoBarEditor();
+    expect(pasteSegmentsAtCursor(state, [])).toBe(state);
   });
 });

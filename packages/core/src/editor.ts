@@ -913,29 +913,14 @@ export function beatsForCells(score: Score, cells: readonly Cell[]): Beat[] {
 }
 
 /**
- * Insert copied beats at the cursor position. Later beats shift right; any
- * overflow cascades bar-by-bar into the following bars (creating bars at the
- * end as needed) so nothing is lost.
+ * Cascade overflow forward in place: while a bar is overfull and has more
+ * than one beat, its tail beats spill into the start of the next bar
+ * (creating bars at the end as needed) so nothing is lost.
  */
-export function pasteBeatsAtCursor(state: EditorState, beats: readonly Beat[]): EditorState {
-  if (beats.length === 0) return state;
-  const cursor = clampCursor(state.score, state.cursor);
-  const bars = track0(state.score).bars;
-  const newBars = [...bars];
-  const bar = newBars[cursor.bar]!;
-  const barBeats = voiceBeats(bar);
-  const insertAt = Math.min(cursor.beat, barBeats.length);
-  newBars[cursor.bar] = withVoiceBeats(bar, [
-    ...barBeats.slice(0, insertAt),
-    ...beats,
-    ...barBeats.slice(insertAt),
-  ]);
-
-  // Cascade overflow forward: while a bar is overfull and has more than one
-  // beat, its tail beats spill into the start of the next bar.
-  for (let i = cursor.bar; i < newBars.length; i++) {
+function cascadeOverflow(newBars: Bar[], fromIndex: number): void {
+  for (let i = fromIndex; i < newBars.length; i++) {
     const current = newBars[i]!;
-    let currentBeats = [...voiceBeats(current)];
+    const currentBeats = [...voiceBeats(current)];
     const capacity = barCapacityInWholes(current.timeSignature);
     const spill: Beat[] = [];
     let filled = currentBeats.reduce((sum, b) => addFractions(sum, beatDurationInWholes(b)), ZERO);
@@ -953,10 +938,92 @@ export function pasteBeatsAtCursor(state: EditorState, beats: readonly Beat[]): 
       newBars.push(createBar(current.timeSignature, [createVoice(spill)]));
     }
   }
+}
+
+/**
+ * Insert copied beats at the cursor position. Later beats shift right; any
+ * overflow cascades bar-by-bar into the following bars (creating bars at the
+ * end as needed) so nothing is lost.
+ */
+export function pasteBeatsAtCursor(state: EditorState, beats: readonly Beat[]): EditorState {
+  if (beats.length === 0) return state;
+  const cursor = clampCursor(state.score, state.cursor);
+  const bars = track0(state.score).bars;
+  const newBars = [...bars];
+  const bar = newBars[cursor.bar]!;
+  const barBeats = voiceBeats(bar);
+  const insertAt = Math.min(cursor.beat, barBeats.length);
+  newBars[cursor.bar] = withVoiceBeats(bar, [
+    ...barBeats.slice(0, insertAt),
+    ...beats,
+    ...barBeats.slice(insertAt),
+  ]);
+  cascadeOverflow(newBars, cursor.bar);
 
   const lastPastedIndex = insertAt + beats.length - 1;
   // The pasted region may itself have spilled; clampCursor keeps this legal.
   return commit(state, withBars(state.score, newBars), { ...cursor, beat: lastPastedIndex });
+}
+
+/** One copied bar's worth of beats, with the bar's time signature. */
+export interface BarSegment {
+  readonly timeSignature: TimeSignature;
+  readonly beats: readonly Beat[];
+}
+
+/** Like beatsForCells, but grouped per source bar so paste can keep barlines. */
+export function segmentsForCells(score: Score, cells: readonly Cell[]): BarSegment[] {
+  const byBar = new Map<number, Cell[]>();
+  for (const cell of cells) {
+    const list = byBar.get(cell.bar) ?? [];
+    list.push(cell);
+    byBar.set(cell.bar, list);
+  }
+  const bars = track0(score).bars;
+  return [...byBar.entries()]
+    .filter(([barIndex]) => bars[barIndex] !== undefined)
+    .sort(([a], [b]) => a - b)
+    .map(([barIndex, barCells]) => ({
+      timeSignature: bars[barIndex]!.timeSignature,
+      beats: beatsForCells(score, barCells),
+    }));
+}
+
+/**
+ * Boundary-preserving paste: segment 0 inserts into the cursor bar at the
+ * cursor beat (overflow cascades forward); every later segment becomes its
+ * own fresh bar — with its copied time signature — right after the cursor
+ * bar, in order. The cursor lands at the end of the pasted region.
+ */
+export function pasteSegmentsAtCursor(state: EditorState, segments: readonly BarSegment[]): EditorState {
+  if (segments.length === 0) return state;
+  if (segments.length === 1) return pasteBeatsAtCursor(state, segments[0]!.beats);
+
+  const cursor = clampCursor(state.score, state.cursor);
+  const bars = track0(state.score).bars;
+  const newBars = [...bars];
+
+  // Later segments first, so segment 0's overflow cascades into them in order.
+  const tailBars = segments.slice(1).map((seg) => createBar(seg.timeSignature, [createVoice(seg.beats)]));
+  newBars.splice(cursor.bar + 1, 0, ...tailBars);
+
+  const bar = newBars[cursor.bar]!;
+  const barBeats = voiceBeats(bar);
+  const insertAt = Math.min(cursor.beat, barBeats.length);
+  newBars[cursor.bar] = withVoiceBeats(bar, [
+    ...barBeats.slice(0, insertAt),
+    ...segments[0]!.beats,
+    ...barBeats.slice(insertAt),
+  ]);
+  cascadeOverflow(newBars, cursor.bar);
+
+  const lastSegmentBar = cursor.bar + segments.length - 1;
+  const lastBeat = Math.max(0, voiceBeats(newBars[lastSegmentBar]!).length - 1);
+  return commit(state, withBars(state.score, newBars), {
+    bar: lastSegmentBar,
+    beat: lastBeat,
+    string: cursor.string,
+  });
 }
 
 // ---------------------------------------------------------------------------

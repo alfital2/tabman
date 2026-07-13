@@ -25,9 +25,11 @@ import {
   moveNoteToString,
   noteAt,
   pasteBeatsAtCursor,
+  pasteSegmentsAtCursor,
   placeCursor,
   redo,
   replaceBarValue,
+  segmentsForCells,
   setBarTimeSignature,
   setBeatsDuration,
   setChordAtCursor,
@@ -65,7 +67,8 @@ import { ToolPanel } from './components/ToolPanel';
 import { TabSheet } from './components/TabSheet';
 import { useTabKeyboard } from './hooks/useTabKeyboard';
 import { useTabPlayer } from './hooks/useTabPlayer';
-import { clipboardBar, clipboardBeats, type ClipboardContent } from './lib/clipboard';
+import { clipboardBar, clipboardBeats, clipboardSegments, type ClipboardContent } from './lib/clipboard';
+import { cellKey } from './lib/selection';
 import { demoScore, nothingElseMatters, showcaseScore } from './lib/demoScore';
 import { brushLabel, longerBrush, nudgeDuration, shorterBrush } from './lib/durationBrush';
 import { combineTypedFret, type TypedFretState } from './lib/fretEntry';
@@ -298,7 +301,8 @@ export function App(): JSX.Element {
       const current = stateRef.current;
       const selected = selectionRef.current;
       if (selected.length > 0) {
-        setClipboard(clipboardBeats(beatsForCells(current.score, selected)));
+        // Grouped per source bar; collapses to plain beats within one bar.
+        setClipboard(clipboardSegments(segmentsForCells(current.score, selected)));
         return;
       }
       const beat = beatAt(current.score, current.cursor.bar, current.cursor.beat);
@@ -312,6 +316,8 @@ export function App(): JSX.Element {
       if (!clipboard) return;
       if (clipboard.kind === 'beats') {
         apply(pasteBeatsAtCursor(current, clipboard.beats));
+      } else if (clipboard.kind === 'segments') {
+        apply(pasteSegmentsAtCursor(current, clipboard.segments));
       } else {
         apply(insertBarValue(current, current.cursor.bar + 1, clipboard.bar));
       }
@@ -542,7 +548,21 @@ export function App(): JSX.Element {
                 apply(placeCursor(stateRef.current, cell));
                 clearSelection();
               }}
-              onSelect={(cells) => {
+              onSelect={(cells, additive) => {
+                if (additive) {
+                  // Desktop-icons semantics: a shift-marquee unions; a
+                  // shift-click on one already-selected cell toggles it out.
+                  const prev = selectionRef.current;
+                  const prevKeys = new Set(prev.map(cellKey));
+                  if (cells.length === 1 && prevKeys.has(cellKey(cells[0]!))) {
+                    setSelection(prev.filter((c) => cellKey(c) !== cellKey(cells[0]!)));
+                    return;
+                  }
+                  const merged = [...prev, ...cells.filter((c) => !prevKeys.has(cellKey(c)))];
+                  setSelection(merged);
+                  if (cells.length > 0) apply(placeCursor(stateRef.current, cells[0]!));
+                  return;
+                }
                 setSelection(cells);
                 if (cells.length > 0) {
                   apply(placeCursor(stateRef.current, cells[0]!));

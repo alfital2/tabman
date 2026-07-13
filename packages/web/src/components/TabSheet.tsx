@@ -41,7 +41,8 @@ export interface TabSheetProps {
   /** Clicking an existing chord label reopens the box to retype it. */
   onEditChord(cell: HitCell, currentName: string): void;
   onPick(cell: HitCell): void;
-  onSelect(cells: Cell[]): void;
+  /** additive = Shift held: union with (or toggle within) the current selection. */
+  onSelect(cells: Cell[], additive: boolean): void;
   onMoveNote(from: Cell, toString: number): void;
   onMoveSelection(delta: number): void;
   onMoveToSlot(cells: readonly Cell[], target: HitCell, isGroup: boolean): void;
@@ -55,6 +56,8 @@ interface DragState {
   endCell: HitCell | null;
   start: { x: number; y: number };
   end: { x: number; y: number };
+  /** Shift held at pointer-down: selection gestures add to the current selection. */
+  additive: boolean;
 }
 
 function primitiveNode(p: Primitive, index: number): JSX.Element {
@@ -192,13 +195,16 @@ export function TabSheet(props: TabSheetProps): JSX.Element {
       return;
     }
     const cell = hitTest(layout, point.x, point.y);
-    const mode: GestureMode =
-      cell && selectionKeys.has(cellKey(cell))
+    // Shift forces a marquee, desktop-icons style: drag adds a rubber-band's
+    // worth of cells to the selection; a shift-click toggles one cell.
+    const mode: GestureMode = event.shiftKey
+      ? 'marquee'
+      : cell && selectionKeys.has(cellKey(cell))
         ? 'group'
         : cell && noteAt(state.score, cell)
           ? 'single'
           : 'marquee';
-    setDrag({ mode, startCell: cell, endCell: cell, start: point, end: point });
+    setDrag({ mode, startCell: cell, endCell: cell, start: point, end: point, additive: event.shiftKey });
     event.currentTarget.setPointerCapture(event.pointerId);
   };
 
@@ -215,10 +221,14 @@ export function TabSheet(props: TabSheetProps): JSX.Element {
     const result = resolveGesture(finished);
     switch (result.kind) {
       case 'pick':
-        props.onPick(result.cell);
+        if (finished.additive && noteAt(state.score, result.cell)) {
+          props.onSelect([result.cell], true); // shift-click toggles one cell
+        } else {
+          props.onPick(result.cell);
+        }
         break;
       case 'select':
-        props.onSelect(cellsInRect(state.score, layout, result.rect));
+        props.onSelect(cellsInRect(state.score, layout, result.rect), finished.additive);
         break;
       case 'moveNote':
         props.onMoveNote(result.from, result.toString);
