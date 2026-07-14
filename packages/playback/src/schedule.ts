@@ -1,9 +1,7 @@
 import {
   addFractions,
-  barCapacityInWholes,
-  barFilledInWholes,
+  barAdvanceWholes,
   beatDurationInWholes,
-  compareFractions,
   fractionToNumber,
   fretToMidi,
   getArticulation,
@@ -70,17 +68,8 @@ function beatsOf(bar: Bar): readonly Beat[] {
   return bar.voices[VOICE]?.beats ?? [];
 }
 
-/**
- * Seconds a bar occupies on the timeline. Bars advance by their
- * time-signature capacity (underfilled bars get a tail of silence, keeping the
- * metronome grid locked); an overfull bar advances by its content so notes
- * never overlap the next bar.
- */
-function barAdvanceWholes(bar: Bar) {
-  const capacity = barCapacityInWholes(bar.timeSignature);
-  const filled = barFilledInWholes(bar);
-  return compareFractions(filled, capacity) > 0 ? filled : capacity;
-}
+// Bar timeline advance (capacity for normal bars, content for overfull and
+// pickup bars) comes from core's barAdvanceWholes.
 
 const BEND_RATIO_PER_TONE = (tones: number) => 2 ** ((tones * 2) / 12);
 /** Fraction of the note's duration before a bend begins. */

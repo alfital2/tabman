@@ -30,6 +30,7 @@ import {
   redo,
   replaceBarValue,
   segmentsForCells,
+  setBarPickup,
   setBarTimeSignature,
   setBeatsDuration,
   setChordAtCursor,
@@ -469,6 +470,9 @@ export function App(): JSX.Element {
         }}
         onSetBarTimeSignature={(index, ts: TimeSignature) => {
           apply(setBarTimeSignature(stateRef.current, index, ts));
+        }}
+        onTogglePickup={(index, pickup) => {
+          apply(setBarPickup(stateRef.current, index, pickup));
         }}
         onAddChord={(cell) => {
           setMenu(null);

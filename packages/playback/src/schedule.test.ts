@@ -260,3 +260,20 @@ describe('beatStartSeconds', () => {
     expect(beatStartSeconds(score, 120, 99, 0)).toBeCloseTo(4);
   });
 });
+
+describe('pickup bars', () => {
+  it('a pickup bar advances the timeline by its content only', () => {
+    // 120 bpm → whole = 2 s, quarter = 0.5 s.
+    const pickup = createBar(FOUR_FOUR, [createVoice([createBeat(QUARTER, [createNote(0, 3)])])], { pickup: true });
+    const main = createBar(FOUR_FOUR, [createVoice([createBeat(QUARTER, [createNote(0, 5)])])]);
+    const schedule = scheduleScore(scoreOf(pickup, main), 120);
+    expect(schedule.events[1]!.startSec).toBeCloseTo(0.5, 5);
+  });
+
+  it('a normal underfull bar still advances by capacity', () => {
+    const a = createBar(FOUR_FOUR, [createVoice([createBeat(QUARTER, [createNote(0, 3)])])]);
+    const b = createBar(FOUR_FOUR, [createVoice([createBeat(QUARTER, [createNote(0, 5)])])]);
+    const schedule = scheduleScore(scoreOf(a, b), 120);
+    expect(schedule.events[1]!.startSec).toBeCloseTo(2, 5);
+  });
+});

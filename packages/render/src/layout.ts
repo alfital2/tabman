@@ -283,17 +283,21 @@ export function layoutScore(score: Score, metrics: Metrics = DEFAULT_METRICS, op
       const { bar, index: barIndex } = placed;
       const barBeats = beats(bar);
 
-      // Measure number above the bar start.
-      primitives.push({
-        kind: 'text',
-        role: 'measureNumber',
-        x: placed.x + 2,
-        y: top - 7,
-        text: String(barIndex + 1),
-        fontSize: m.measureNumberFontSize,
-        anchor: 'start',
-        baseline: 'middle',
-      });
+      // Measure number above the bar start. A pickup bar is unnumbered and
+      // numbering starts at 1 on the bar after it.
+      const numberOffset = bars[0]?.pickup ? 0 : 1;
+      if (!bar.pickup) {
+        primitives.push({
+          kind: 'text',
+          role: 'measureNumber',
+          x: placed.x + 2,
+          y: top - 7,
+          text: String(barIndex + numberOffset),
+          fontSize: m.measureNumberFontSize,
+          anchor: 'start',
+          baseline: 'middle',
+        });
+      }
 
       let contentX = placed.x + m.barStartPad;
       if (placed.showTimeSignature) {

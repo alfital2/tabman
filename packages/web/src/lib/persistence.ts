@@ -21,7 +21,8 @@ import {
 } from '@tabkit/core';
 
 export const STORAGE_KEY = 'tabkit.current-document.v0';
-export const FILE_SCHEMA_VERSION = 1;
+// v2: bars carry a `pickup` flag (v1 files load with pickup = false).
+export const FILE_SCHEMA_VERSION = 2;
 
 type Json = Record<string, unknown>;
 
@@ -100,7 +101,7 @@ function barFromJson(value: unknown, stringCount: number): Bar {
     ts = createTimeSignature(4, 4);
   }
   const voices = asArray(record?.voices).map((v) => voiceFromJson(v, stringCount));
-  return createBar(ts, voices.length > 0 ? voices : undefined);
+  return createBar(ts, voices.length > 0 ? voices : undefined, { pickup: record?.pickup === true });
 }
 
 function trackFromJson(value: unknown): Track {

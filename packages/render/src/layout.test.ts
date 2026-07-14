@@ -233,3 +233,24 @@ describe('tuplet marks', () => {
     expect(layout.primitives.some((p) => p.kind === 'text' && p.role === 'tuplet')).toBe(false);
   });
 });
+
+describe('pickup bar numbering', () => {
+  it('skips the pickup bar and numbers the next bar 1', () => {
+    const score = createScore({
+      tracks: [
+        createTrack({
+          bars: [
+            createBar(FOUR_FOUR, [createVoice([createBeat(QUARTER, [createNote(0, 3)])])], { pickup: true }),
+            createBar(FOUR_FOUR),
+            createBar(FOUR_FOUR),
+          ],
+        }),
+      ],
+    });
+    const layout = layoutScore(score);
+    const numbers = layout.primitives
+      .filter((p): p is TextPrimitive => p.kind === 'text' && p.role === 'measureNumber')
+      .map((p) => p.text);
+    expect(numbers).toEqual(['1', '2']);
+  });
+});

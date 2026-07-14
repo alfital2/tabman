@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createDefaultScore, noteAt } from '@tabkit/core';
+import { createBar, createDefaultScore, createScore, createTrack, FOUR_FOUR, noteAt } from '@tabkit/core';
 import { demoScore, showcaseScore, nothingElseMatters } from './demoScore';
 import {
   loadStoredScore,
@@ -103,7 +103,7 @@ describe('file format', () => {
     const text = scoreToFileJson(score);
     const parsed = JSON.parse(text) as { format: string; schemaVersion: number };
     expect(parsed.format).toBe('tabkit');
-    expect(parsed.schemaVersion).toBe(1);
+    expect(parsed.schemaVersion).toBe(2);
     expect(scoreFromFileJson(text)).toEqual(score);
   });
 
@@ -117,5 +117,26 @@ describe('file format', () => {
   it('suggests a safe file name', () => {
     expect(suggestedFileName(demoScore())).toBe('demo-riff.tabkit.json');
     expect(suggestedFileName(createDefaultScore())).toBe('untitled.tabkit.json');
+  });
+});
+
+describe('pickup flag', () => {
+  it('survives the file format and defaults to false for v1 files', () => {
+    const score = createScore({
+      tracks: [
+        createTrack({
+          bars: [createBar(FOUR_FOUR, undefined, { pickup: true }), createBar(FOUR_FOUR)],
+        }),
+      ],
+    });
+    const revived = scoreFromFileJson(scoreToFileJson(score))!;
+    expect(revived.tracks[0]!.bars[0]!.pickup).toBe(true);
+    expect(revived.tracks[0]!.bars[1]!.pickup).toBe(false);
+
+    // A v1 file (no pickup fields) loads with pickup false everywhere.
+    const v1 = JSON.parse(scoreToFileJson(score)) as { score: { tracks: Array<{ bars: Array<Record<string, unknown>> }> } };
+    for (const bar of v1.score.tracks[0]!.bars) delete bar.pickup;
+    const legacy = scoreFromJson(v1.score)!;
+    expect(legacy.tracks[0]!.bars[0]!.pickup).toBe(false);
   });
 });

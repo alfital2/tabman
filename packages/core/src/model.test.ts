@@ -3,6 +3,7 @@ import { bend } from './articulation';
 import { createDuration, HALF, QUARTER, WHOLE } from './duration';
 import { fraction, fractionEquals } from './fraction';
 import {
+  barAdvanceWholes,
   barFilledInWholes,
   barHasRoomFor,
   clampTempo,
@@ -128,5 +129,31 @@ describe('score', () => {
     expect(() => createTrack({ tuning: [] })).toThrow(RangeError);
     expect(() => createScore({ tracks: [] })).toThrow(RangeError);
     expect(() => createBar(FOUR_FOUR, [])).toThrow(RangeError);
+  });
+});
+
+describe('pickup bars', () => {
+  it('createBar defaults pickup to false and accepts the flag', () => {
+    expect(createBar(FOUR_FOUR).pickup).toBe(false);
+    expect(createBar(FOUR_FOUR, undefined, { pickup: true }).pickup).toBe(true);
+  });
+
+  it('barAdvanceWholes: normal bar advances by capacity even when underfull', () => {
+    const bar = createBar(FOUR_FOUR, [createVoice([createBeat(QUARTER, [createNote(0, 1)])])]);
+    expect(fractionEquals(barAdvanceWholes(bar), fraction(1, 1))).toBe(true);
+  });
+
+  it('barAdvanceWholes: pickup bar advances by its content', () => {
+    const bar = createBar(FOUR_FOUR, [createVoice([createBeat(QUARTER, [createNote(0, 1)])])], { pickup: true });
+    expect(fractionEquals(barAdvanceWholes(bar), fraction(1, 4))).toBe(true);
+  });
+
+  it('barAdvanceWholes: empty pickup falls back to capacity; overfull uses content', () => {
+    expect(fractionEquals(barAdvanceWholes(createBar(FOUR_FOUR, undefined, { pickup: true })), fraction(1, 1))).toBe(true);
+    const overfull = createBar(
+      createTimeSignature(1, 4),
+      [createVoice([createBeat(HALF, [createNote(0, 1)])])],
+    );
+    expect(fractionEquals(barAdvanceWholes(overfull), fraction(1, 2))).toBe(true);
   });
 });

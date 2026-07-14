@@ -1,10 +1,4 @@
-import {
-  barCapacityInWholes,
-  barFilledInWholes,
-  compareFractions,
-  fractionToNumber,
-  type Score,
-} from '@tabkit/core';
+import { barAdvanceWholes, fraction, fractionToNumber, compareFractions, type Score } from '@tabkit/core';
 import { beatStartSeconds, secondsPerWhole, type PlayFrom } from './schedule';
 
 export interface MetronomeClick {
@@ -29,12 +23,12 @@ export function metronomeClicks(score: Score, bpm: number, from?: PlayFrom): Met
   for (const bar of track.bars) {
     const ts = bar.timeSignature;
     const beatSec = spw / ts.denominator;
+    const advance = barAdvanceWholes(bar);
     for (let i = 0; i < ts.numerator; i++) {
+      // A short bar (pickup) only clicks inside its actual length.
+      if (compareFractions(fraction(i, ts.denominator), advance) >= 0) break;
       clicks.push({ timeSec: barStart + i * beatSec, accent: i === 0 });
     }
-    const capacity = barCapacityInWholes(ts);
-    const filled = barFilledInWholes(bar);
-    const advance = compareFractions(filled, capacity) > 0 ? filled : capacity;
     barStart += fractionToNumber(advance) * spw;
   }
 

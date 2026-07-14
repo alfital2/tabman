@@ -57,3 +57,21 @@ describe('metronomeClicks', () => {
     expect(clicks[0]).toEqual({ timeSec: 0, accent: true });
   });
 });
+
+describe('pickup bars', () => {
+  it('clicks only inside the pickup bar length, next downbeat right after', () => {
+    // 120 bpm, 4/4: beat = 0.5 s. Pickup holds one quarter → one click at 0,
+    // then bar 2's accented downbeat at 0.5 (not 2.0).
+    const pickup = createBar(
+      FOUR_FOUR,
+      [createVoice([createBeat(QUARTER, [createNote(0, 3)])])],
+      { pickup: true },
+    );
+    const main = createBar(FOUR_FOUR);
+    const score = createScore({ tempo: 120, tracks: [createTrack({ bars: [pickup, main] })] });
+    const clicks = metronomeClicks(score, 120);
+    expect(clicks[0]).toEqual({ timeSec: 0, accent: true });
+    expect(clicks[1]).toEqual({ timeSec: 0.5, accent: true });
+    expect(clicks.filter((c) => c.timeSec < 0.5)).toHaveLength(1);
+  });
+});

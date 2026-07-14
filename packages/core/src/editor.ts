@@ -66,7 +66,7 @@ function voiceBeats(bar: Bar): readonly Beat[] {
 
 function withVoiceBeats(bar: Bar, beats: readonly Beat[]): Bar {
   const voices = bar.voices.map((v, i) => (i === VOICE ? createVoice(beats) : v));
-  return createBar(bar.timeSignature, voices);
+  return createBar(bar.timeSignature, voices, { pickup: bar.pickup });
 }
 
 function withBars(score: Score, bars: readonly Bar[]): Score {
@@ -766,7 +766,12 @@ export function moveNotesToSlot(state: EditorState, cells: readonly Cell[], targ
   });
 }
 
-/** Delete the notes at the given cells; emptied beats become rests. */
+/**
+ * Delete the notes at the given cells; emptied beats become rests. When every
+ * targeted beat is already a rest, the pass removes the slots themselves —
+ * so a second Delete on the same selection tightens the bars, mirroring the
+ * cursor's double-Backspace.
+ */
 export function deleteCells(state: EditorState, cells: readonly Cell[]): EditorState {
   const bars = track0(state.score).bars;
   const newBars = [...bars];
@@ -778,6 +783,24 @@ export function deleteCells(state: EditorState, cells: readonly Cell[]): EditorS
     if (!set) byBeat.set(key, (set = new Set()));
     set.add(cell.string);
   }
+
+  const targetedBeats = uniqueBeatRefs(cells)
+    .map((ref) => ({ ref, beat: beatAt(state.score, ref.bar, ref.beat) }))
+    .filter((t): t is { ref: { bar: number; beat: number }; beat: Beat } => t.beat !== undefined);
+  if (targetedBeats.length > 0 && targetedBeats.every((t) => isRest(t.beat))) {
+    const removeByBar = new Map<number, Set<number>>();
+    for (const { ref } of targetedBeats) {
+      let set = removeByBar.get(ref.bar);
+      if (!set) removeByBar.set(ref.bar, (set = new Set()));
+      set.add(ref.beat);
+    }
+    for (const [barIndex, remove] of removeByBar) {
+      const bar = newBars[barIndex]!;
+      newBars[barIndex] = withVoiceBeats(bar, voiceBeats(bar).filter((_, j) => !remove.has(j)));
+    }
+    return commit(state, withBars(state.score, newBars));
+  }
+
   for (const [key, strings] of byBeat) {
     const [barIndex, beatIndex] = key.split(':').map(Number) as [number, number];
     const bar = newBars[barIndex];
@@ -857,7 +880,15 @@ export function setBarTimeSignature(state: EditorState, index: number, ts: TimeS
   const bars = track0(state.score).bars;
   const bar = bars[index];
   if (!bar || timeSignatureEquals(bar.timeSignature, ts)) return state;
-  return replaceBarValue(state, index, createBar(ts, bar.voices));
+  return replaceBarValue(state, index, createBar(ts, bar.voices, { pickup: bar.pickup }));
+}
+
+/** Mark/unmark a bar as a pickup (anacrusis). */
+export function setBarPickup(state: EditorState, index: number, pickup: boolean): EditorState {
+  const bars = track0(state.score).bars;
+  const bar = bars[index];
+  if (!bar || bar.pickup === pickup) return state;
+  return replaceBarValue(state, index, createBar(bar.timeSignature, bar.voices, { pickup }));
 }
 
 /**

@@ -24,6 +24,8 @@ export interface Voice {
 export interface Bar {
   readonly timeSignature: TimeSignature;
   readonly voices: readonly Voice[];
+  /** Anacrusis: the bar is only as long as its content (playback + metronome). */
+  readonly pickup: boolean;
 }
 
 export interface Track {
@@ -98,11 +100,20 @@ export function voiceDurationInWholes(voice: Voice): Fraction {
   return voice.beats.reduce((sum, beat) => addFractions(sum, beatDurationInWholes(beat)), ZERO);
 }
 
-export function createBar(timeSignature: TimeSignature, voices: readonly Voice[] = [createVoice()]): Bar {
+export interface BarOptions {
+  pickup?: boolean;
+}
+
+export function createBar(
+  timeSignature: TimeSignature,
+  voices: readonly Voice[] = [createVoice()],
+  options: BarOptions = {},
+): Bar {
   if (voices.length === 0) {
     throw new RangeError('a bar needs at least one voice');
   }
-  return Object.freeze({ timeSignature, voices: Object.freeze([...voices]) });
+  const { pickup = false } = options;
+  return Object.freeze({ timeSignature, voices: Object.freeze([...voices]), pickup });
 }
 
 /** Longest voice's content, in whole notes. */
@@ -124,6 +135,18 @@ export function isBarOverfull(bar: Bar): boolean {
 export function barHasRoomFor(bar: Bar, addedWholes: Fraction): boolean {
   const after = addFractions(barFilledInWholes(bar), addedWholes);
   return compareFractions(after, barCapacityInWholes(bar.timeSignature)) <= 0;
+}
+
+/**
+ * How far a bar advances the timeline, in wholes. Normal bars advance by
+ * capacity (underfilled bars get a tail of silence); overfull bars — and
+ * non-empty pickup bars — advance by their content.
+ */
+export function barAdvanceWholes(bar: Bar): Fraction {
+  const capacity = barCapacityInWholes(bar.timeSignature);
+  const filled = barFilledInWholes(bar);
+  if (bar.pickup && compareFractions(filled, ZERO) > 0) return filled;
+  return compareFractions(filled, capacity) > 0 ? filled : capacity;
 }
 
 export interface TrackOptions {

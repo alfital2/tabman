@@ -21,6 +21,8 @@ export interface ContextMenuProps {
   onDeleteBar(index: number): void;
   onSetDuration(cell: HitCell, duration: Duration): void;
   onSetBarTimeSignature(index: number, ts: TimeSignature): void;
+  /** Toggle the anacrusis flag (offered on the first bar only). */
+  onTogglePickup(index: number, pickup: boolean): void;
   onAddChord(cell: HitCell): void;
   onClose(): void;
 }
@@ -114,6 +116,10 @@ export function ContextMenu(props: ContextMenuProps): JSX.Element {
       {item(`Delete bar ${String(barNumber)}`, () => {
         props.onDeleteBar(cell.bar);
       })}
+      {cell.bar === 0 &&
+        item(state.score.tracks[0]?.bars[0]?.pickup ? '✓ Pickup bar (anacrusis)' : 'Pickup bar (anacrusis)', () => {
+          props.onTogglePickup(0, !state.score.tracks[0]?.bars[0]?.pickup);
+        })}
       {showDurations && (
         <>
           <div className="menu-separator" />

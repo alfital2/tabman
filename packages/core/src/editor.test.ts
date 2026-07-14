@@ -25,6 +25,7 @@ import {
   pasteSegmentsAtCursor,
   placeCursor,
   redo,
+  setBarPickup,
   setBarTimeSignature,
   setChordAtCursor,
   setFretAtCursor,
@@ -853,5 +854,70 @@ describe('bar segments copy/paste', () => {
   it('empty segment list is a no-op', () => {
     const state = twoBarEditor();
     expect(pasteSegmentsAtCursor(state, [])).toBe(state);
+  });
+});
+
+describe('deleteCells rest collapsing', () => {
+  function twoNoteBar(): EditorState {
+    let state = emptyEditor();
+    state = setFretAtCursor(state, 1, QUARTER);
+    state = placeCursor(state, { bar: 0, beat: 1, string: 0 });
+    state = setFretAtCursor(state, 2, QUARTER);
+    return state;
+  }
+
+  it('first delete strips notes to rests, second delete removes the rest slots', () => {
+    let state = twoNoteBar();
+    const cells = [
+      { bar: 0, beat: 0, string: 0 },
+      { bar: 0, beat: 1, string: 0 },
+    ];
+    state = deleteCells(state, cells);
+    expect(isRest(beatAt(state.score, 0, 0)!)).toBe(true);
+    expect(isRest(beatAt(state.score, 0, 1)!)).toBe(true);
+    state = deleteCells(state, cells);
+    expect(beatAt(state.score, 0, 0)).toBeUndefined();
+  });
+
+  it('mixed selection only strips notes, keeps all slots', () => {
+    let state = twoNoteBar();
+    state = deleteCells(state, [{ bar: 0, beat: 0, string: 0 }]); // beat 0 now a rest
+    state = deleteCells(state, [
+      { bar: 0, beat: 0, string: 0 },
+      { bar: 0, beat: 1, string: 0 },
+    ]);
+    // beat 1 had a note: this pass strips it, and both slots survive as rests.
+    expect(isRest(beatAt(state.score, 0, 0)!)).toBe(true);
+    expect(isRest(beatAt(state.score, 0, 1)!)).toBe(true);
+  });
+});
+
+describe('setBarPickup', () => {
+  it('toggles the flag, undoably', () => {
+    let state = emptyEditor();
+    state = setBarPickup(state, 0, true);
+    expect(state.score.tracks[0]!.bars[0]!.pickup).toBe(true);
+    state = undo(state);
+    expect(state.score.tracks[0]!.bars[0]!.pickup).toBe(false);
+  });
+
+  it('is a no-op when unchanged or out of range', () => {
+    const state = emptyEditor();
+    expect(setBarPickup(state, 0, false)).toBe(state);
+    expect(setBarPickup(state, 99, true)).toBe(state);
+  });
+
+  it('editing inside a pickup bar keeps the flag', () => {
+    let state = emptyEditor();
+    state = setBarPickup(state, 0, true);
+    state = setFretAtCursor(state, 5, QUARTER);
+    expect(state.score.tracks[0]!.bars[0]!.pickup).toBe(true);
+  });
+
+  it('changing a bar time signature keeps the flag', () => {
+    let state = emptyEditor();
+    state = setBarPickup(state, 0, true);
+    state = setBarTimeSignature(state, 0, createTimeSignature(3, 4));
+    expect(state.score.tracks[0]!.bars[0]!.pickup).toBe(true);
   });
 });
