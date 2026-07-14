@@ -23,6 +23,8 @@ export interface ContextMenuProps {
   onSetBarTimeSignature(index: number, ts: TimeSignature): void;
   /** Toggle the anacrusis flag (offered on the first bar only). */
   onTogglePickup(index: number, pickup: boolean): void;
+  /** Patch repeat flags on a bar (start / end count / endings). */
+  onSetRepeat(index: number, patch: { repeatStart?: boolean; repeatEnd?: number | null; endings?: number[] }): void;
   onAddChord(cell: HitCell): void;
   onClose(): void;
 }
@@ -142,6 +144,55 @@ export function ContextMenu(props: ContextMenuProps): JSX.Element {
           </div>
         </>
       )}
+      <div className="menu-separator" />
+      <div className="menu-row-label">Repeats &amp; endings</div>
+      <div className="menu-row">
+        {(() => {
+          const bar = state.score.tracks[0]?.bars[cell.bar];
+          const chip = (label: string, active: boolean, action: () => void, title?: string) => (
+            <button
+              key={label}
+              type="button"
+              className={`menu-chip${active ? ' active' : ''}`}
+              title={title ?? label}
+              onClick={() => {
+                action();
+                props.onClose();
+              }}
+            >
+              {label}
+            </button>
+          );
+          const endingsEqual = (a: readonly number[] | undefined, b: number[]) =>
+            a !== undefined && a.length === b.length && b.every((n, i) => a[i] === n);
+          return [
+            chip('𝄆', bar?.repeatStart === true, () => {
+              props.onSetRepeat(cell.bar, { repeatStart: bar?.repeatStart !== true });
+            }, 'Repeat start (toggle)'),
+            chip('𝄇×2', bar?.repeatEnd === 2, () => {
+              props.onSetRepeat(cell.bar, { repeatEnd: bar?.repeatEnd === 2 ? null : 2 });
+            }, 'Repeat end, play twice (toggle)'),
+            chip('𝄇×3', bar?.repeatEnd === 3, () => {
+              props.onSetRepeat(cell.bar, { repeatEnd: bar?.repeatEnd === 3 ? null : 3 });
+            }, 'Repeat end, play 3× (toggle)'),
+            chip('𝄇×4', bar?.repeatEnd === 4, () => {
+              props.onSetRepeat(cell.bar, { repeatEnd: bar?.repeatEnd === 4 ? null : 4 });
+            }, 'Repeat end, play 4× (toggle)'),
+            chip('1.', endingsEqual(bar?.endings, [1]), () => {
+              props.onSetRepeat(cell.bar, { endings: endingsEqual(bar?.endings, [1]) ? [] : [1] });
+            }, '1st ending (toggle)'),
+            chip('2.', endingsEqual(bar?.endings, [2]), () => {
+              props.onSetRepeat(cell.bar, { endings: endingsEqual(bar?.endings, [2]) ? [] : [2] });
+            }, '2nd ending (toggle)'),
+            chip('1.2.', endingsEqual(bar?.endings, [1, 2]), () => {
+              props.onSetRepeat(cell.bar, { endings: endingsEqual(bar?.endings, [1, 2]) ? [] : [1, 2] });
+            }, '1st & 2nd ending (toggle)'),
+            chip('✕', false, () => {
+              props.onSetRepeat(cell.bar, { repeatStart: false, repeatEnd: null, endings: [] });
+            }, 'Clear repeats & endings on this bar'),
+          ];
+        })()}
+      </div>
       <div className="menu-separator" />
       <div className="menu-row-label">Time signature of bar {String(barNumber)}</div>
       <div className="menu-row">

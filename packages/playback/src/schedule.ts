@@ -6,6 +6,7 @@ import {
   fretToMidi,
   getArticulation,
   midiToFrequency,
+  unrollBars,
   ZERO,
   type Articulation,
   type Bar,
@@ -148,9 +149,12 @@ export function scheduleScore(score: Score, bpm: number, from?: PlayFrom): Sched
   const track = score.tracks[TRACK];
   if (!track) return { events: [], totalSec: 0 };
 
+  // Repeats and voltas are flattened first: events sit in playing order and
+  // keep their ORIGINAL bar index, so the playhead follows the jumps.
   const events: ScheduledEvent[] = [];
   let barStart = 0;
-  track.bars.forEach((bar, barIndex) => {
+  for (const { barIndex } of unrollBars(track.bars)) {
+    const bar = track.bars[barIndex]!;
     let t = barStart;
     beatsOf(bar).forEach((beat, beatIndex) => {
       const durationSec = fractionToNumber(beatDurationInWholes(beat)) * spw;
@@ -170,7 +174,7 @@ export function scheduleScore(score: Score, bpm: number, from?: PlayFrom): Sched
       t += durationSec;
     });
     barStart += fractionToNumber(barAdvanceWholes(bar)) * spw;
-  });
+  }
   const totalSec = barStart;
 
   if (!from || (from.fromBar === undefined && from.fromBeat === undefined)) {
@@ -182,11 +186,11 @@ export function scheduleScore(score: Score, bpm: number, from?: PlayFrom): Sched
   // that starts mid-cut (e.g. the first kept note was a legato target whose
   // source was dropped) is re-analysed with that note as a fresh pick, instead
   // of a stale `attack:false` that would silence the rest of the chain.
-  const fromBar = from.fromBar ?? 0;
-  const fromBeat = from.fromBeat ?? 0;
-  const t0 = beatStartSeconds(score, bpm, fromBar, fromBeat);
+  // With repeats, "from the cursor" means the FIRST unrolled occurrence.
+  const t0 = beatStartSeconds(score, bpm, from.fromBar ?? 0, from.fromBeat ?? 0);
+  const EPS = 1e-9;
   const rebased = events
-    .filter((e) => e.bar > fromBar || (e.bar === fromBar && e.beat >= fromBeat))
+    .filter((e) => e.startSec >= t0 - EPS)
     .map((e) => ({ ...e, startSec: e.startSec - t0, notes: e.notes.map((note) => ({ ...note })) }));
   foldChains(rebased);
   return { events: rebased, totalSec: Math.max(0, totalSec - t0) };
@@ -259,18 +263,25 @@ function foldChains(events: ScheduledEvent[]): void {
   }
 }
 
-/** Absolute start time of a cell (bar, beat) on the schedule timeline. */
+/**
+ * Absolute start time of a cell (bar, beat) on the unrolled timeline —
+ * the FIRST time that bar is played when repeats are in effect.
+ */
 export function beatStartSeconds(score: Score, bpm: number, barIndex: number, beatIndex: number): number {
   const spw = secondsPerWhole(bpm);
   const track = score.tracks[TRACK];
   if (!track) return 0;
   let t = 0;
-  for (let i = 0; i < Math.min(barIndex, track.bars.length); i++) {
-    t += fractionToNumber(barAdvanceWholes(track.bars[i]!)) * spw;
+  let found: Bar | undefined;
+  for (const { barIndex: playedIndex } of unrollBars(track.bars)) {
+    if (playedIndex === barIndex) {
+      found = track.bars[playedIndex];
+      break;
+    }
+    t += fractionToNumber(barAdvanceWholes(track.bars[playedIndex]!)) * spw;
   }
-  const bar = track.bars[barIndex];
-  if (!bar) return t;
-  const beats = beatsOf(bar);
+  if (!found) return t;
+  const beats = beatsOf(found);
   let within = ZERO;
   for (let j = 0; j < Math.min(beatIndex, beats.length); j++) {
     within = addFractions(within, beatDurationInWholes(beats[j]!));

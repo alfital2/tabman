@@ -299,6 +299,35 @@ export function layoutScore(score: Score, metrics: Metrics = DEFAULT_METRICS, op
         });
       }
 
+      // Repeat signs: thick line + two dots hugging the barline; ×N above
+      // the end sign when the count is more than the default 2.
+      const dotYHigh = top + staffHeight / 2 - m.staffLineGap * 0.8;
+      const dotYLow = top + staffHeight / 2 + m.staffLineGap * 0.8;
+      if (bar.repeatStart) {
+        const x = placed.x + 1.5;
+        primitives.push({ kind: 'line', role: 'barlineThick', x1: x, y1: top, x2: x, y2: bottom });
+        primitives.push({ kind: 'ellipse', role: 'dot', cx: x + 5.5, cy: dotYHigh, rx: 1.6, ry: 1.6, filled: true });
+        primitives.push({ kind: 'ellipse', role: 'dot', cx: x + 5.5, cy: dotYLow, rx: 1.6, ry: 1.6, filled: true });
+      }
+      if (bar.repeatEnd !== null) {
+        const x = placed.x + placed.width - 1.5;
+        primitives.push({ kind: 'line', role: 'barlineThick', x1: x, y1: top, x2: x, y2: bottom });
+        primitives.push({ kind: 'ellipse', role: 'dot', cx: x - 5.5, cy: dotYHigh, rx: 1.6, ry: 1.6, filled: true });
+        primitives.push({ kind: 'ellipse', role: 'dot', cx: x - 5.5, cy: dotYLow, rx: 1.6, ry: 1.6, filled: true });
+        if (bar.repeatEnd > 2) {
+          primitives.push({
+            kind: 'text',
+            role: 'repeatCount',
+            x: x - 2,
+            y: top - 7,
+            text: `×${String(bar.repeatEnd)}`,
+            fontSize: m.measureNumberFontSize,
+            anchor: 'end',
+            baseline: 'middle',
+          });
+        }
+      }
+
       let contentX = placed.x + m.barStartPad;
       if (placed.showTimeSignature) {
         const tsX = placed.x + m.barStartPad / 2 + TIME_SIGNATURE_WIDTH / 2;
@@ -524,6 +553,41 @@ export function layoutScore(score: Score, metrics: Metrics = DEFAULT_METRICS, op
           path: { track: TRACK, bar: barIndex, voice: VOICE, beat: barBeats.length },
           rect: boxRect(cx),
         });
+      }
+    }
+
+    // Volta brackets: one per contiguous run of bars sharing the same
+    // endings, drawn above the staff with down-ticks and a "1." label.
+    {
+      const sameEndings = (a: readonly number[], b: readonly number[]) =>
+        a.length === b.length && a.every((n, i) => n === b[i]);
+      // Clamped so the first system's bracket stays inside the page.
+      const voltaY = Math.max(top - m.staffLineGap * 2.1, 2);
+      let v = 0;
+      while (v < systemBars.length) {
+        const endings = systemBars[v]!.bar.endings;
+        if (endings.length === 0) {
+          v += 1;
+          continue;
+        }
+        let vEnd = v;
+        while (vEnd + 1 < systemBars.length && sameEndings(systemBars[vEnd + 1]!.bar.endings, endings)) vEnd += 1;
+        const x1 = systemBars[v]!.x + 1.5;
+        const x2 = systemBars[vEnd]!.x + systemBars[vEnd]!.width - 3;
+        primitives.push({ kind: 'line', role: 'voltaBracket', x1, y1: voltaY, x2, y2: voltaY });
+        primitives.push({ kind: 'line', role: 'voltaBracket', x1, y1: voltaY, x2: x1, y2: voltaY + 5 });
+        primitives.push({ kind: 'line', role: 'voltaBracket', x1: x2, y1: voltaY, x2, y2: voltaY + 5 });
+        primitives.push({
+          kind: 'text',
+          role: 'volta',
+          x: x1 + 3.5,
+          y: voltaY + 6,
+          text: endings.map((n) => `${String(n)}.`).join(''),
+          fontSize: m.measureNumberFontSize,
+          anchor: 'start',
+          baseline: 'auto',
+        });
+        v = vEnd + 1;
       }
     }
 

@@ -101,7 +101,12 @@ function barFromJson(value: unknown, stringCount: number): Bar {
     ts = createTimeSignature(4, 4);
   }
   const voices = asArray(record?.voices).map((v) => voiceFromJson(v, stringCount));
-  return createBar(ts, voices.length > 0 ? voices : undefined, { pickup: record?.pickup === true });
+  return createBar(ts, voices.length > 0 ? voices : undefined, {
+    pickup: record?.pickup === true,
+    repeatStart: record?.repeatStart === true,
+    repeatEnd: typeof record?.repeatEnd === 'number' ? record.repeatEnd : null,
+    endings: asArray(record?.endings).filter((n): n is number => typeof n === 'number'),
+  });
 }
 
 function trackFromJson(value: unknown): Track {

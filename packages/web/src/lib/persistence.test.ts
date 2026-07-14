@@ -140,3 +140,26 @@ describe('pickup flag', () => {
     expect(legacy.tracks[0]!.bars[0]!.pickup).toBe(false);
   });
 });
+
+describe('repeat flags', () => {
+  it('round-trip through the file format', () => {
+    const score = createScore({
+      tracks: [
+        createTrack({
+          bars: [
+            createBar(FOUR_FOUR, undefined, { repeatStart: true }),
+            createBar(FOUR_FOUR, undefined, { repeatEnd: 3, endings: [1] }),
+            createBar(FOUR_FOUR, undefined, { endings: [2] }),
+          ],
+        }),
+      ],
+    });
+    const revived = scoreFromFileJson(scoreToFileJson(score))!;
+    const bars = revived.tracks[0]!.bars;
+    expect(bars[0]!.repeatStart).toBe(true);
+    expect(bars[1]!.repeatEnd).toBe(3);
+    expect(bars[1]!.endings).toEqual([1]);
+    expect(bars[2]!.endings).toEqual([2]);
+    expect(bars[2]!.repeatEnd).toBeNull();
+  });
+});

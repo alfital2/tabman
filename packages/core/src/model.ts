@@ -26,6 +26,12 @@ export interface Bar {
   readonly voices: readonly Voice[];
   /** Anacrusis: the bar is only as long as its content (playback + metronome). */
   readonly pickup: boolean;
+  /** |: — playback jumps back here from the matching repeat end. */
+  readonly repeatStart: boolean;
+  /** :| with its play count (2..8), or null. */
+  readonly repeatEnd: number | null;
+  /** Volta membership ("1." / "2." brackets); empty = no ending. */
+  readonly endings: readonly number[];
 }
 
 export interface Track {
@@ -102,6 +108,10 @@ export function voiceDurationInWholes(voice: Voice): Fraction {
 
 export interface BarOptions {
   pickup?: boolean;
+  repeatStart?: boolean;
+  /** Play count 2..8 (clamped); null/undefined = no repeat end. */
+  repeatEnd?: number | null;
+  endings?: readonly number[];
 }
 
 export function createBar(
@@ -112,8 +122,27 @@ export function createBar(
   if (voices.length === 0) {
     throw new RangeError('a bar needs at least one voice');
   }
-  const { pickup = false } = options;
-  return Object.freeze({ timeSignature, voices: Object.freeze([...voices]), pickup });
+  const { pickup = false, repeatStart = false, repeatEnd = null, endings = [] } = options;
+  const count =
+    typeof repeatEnd === 'number' && Number.isFinite(repeatEnd)
+      ? Math.min(8, Math.max(2, Math.round(repeatEnd)))
+      : null;
+  const cleanEndings = [...new Set(endings.filter((n) => Number.isSafeInteger(n) && n >= 1 && n <= 9))].sort(
+    (a, b) => a - b,
+  );
+  return Object.freeze({
+    timeSignature,
+    voices: Object.freeze([...voices]),
+    pickup,
+    repeatStart,
+    repeatEnd: count,
+    endings: Object.freeze(cleanEndings),
+  });
+}
+
+/** Every non-content flag of a bar, ready to feed back into createBar. */
+export function barOptions(bar: Bar): BarOptions {
+  return { pickup: bar.pickup, repeatStart: bar.repeatStart, repeatEnd: bar.repeatEnd, endings: bar.endings };
 }
 
 /** Longest voice's content, in whole notes. */

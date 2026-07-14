@@ -5,6 +5,7 @@ import { restringFret, MAX_FRET } from './pitch';
 import { barCapacityInWholes, timeSignatureEquals, FOUR_FOUR, type TimeSignature } from './timeSignature';
 import {
   barFilledInWholes,
+  barOptions,
   beatDurationInWholes,
   createBar,
   createBeat,
@@ -16,6 +17,7 @@ import {
   withTrackBars,
   withTracks,
   type Bar,
+  type BarOptions,
   type Beat,
   type Note,
   type Score,
@@ -66,7 +68,7 @@ function voiceBeats(bar: Bar): readonly Beat[] {
 
 function withVoiceBeats(bar: Bar, beats: readonly Beat[]): Bar {
   const voices = bar.voices.map((v, i) => (i === VOICE ? createVoice(beats) : v));
-  return createBar(bar.timeSignature, voices, { pickup: bar.pickup });
+  return createBar(bar.timeSignature, voices, barOptions(bar));
 }
 
 function withBars(score: Score, bars: readonly Bar[]): Score {
@@ -880,7 +882,7 @@ export function setBarTimeSignature(state: EditorState, index: number, ts: TimeS
   const bars = track0(state.score).bars;
   const bar = bars[index];
   if (!bar || timeSignatureEquals(bar.timeSignature, ts)) return state;
-  return replaceBarValue(state, index, createBar(ts, bar.voices, { pickup: bar.pickup }));
+  return replaceBarValue(state, index, createBar(ts, bar.voices, barOptions(bar)));
 }
 
 /** Mark/unmark a bar as a pickup (anacrusis). */
@@ -888,7 +890,24 @@ export function setBarPickup(state: EditorState, index: number, pickup: boolean)
   const bars = track0(state.score).bars;
   const bar = bars[index];
   if (!bar || bar.pickup === pickup) return state;
-  return replaceBarValue(state, index, createBar(bar.timeSignature, bar.voices, { pickup }));
+  return replaceBarValue(state, index, createBar(bar.timeSignature, bar.voices, { ...barOptions(bar), pickup }));
+}
+
+/** Patch a bar's repeat flags (start / end count / endings), undoably. */
+export function setBarRepeat(state: EditorState, index: number, patch: Omit<BarOptions, 'pickup'>): EditorState {
+  const bars = track0(state.score).bars;
+  const bar = bars[index];
+  if (!bar) return state;
+  const next = createBar(bar.timeSignature, bar.voices, { ...barOptions(bar), ...patch });
+  if (
+    next.repeatStart === bar.repeatStart &&
+    next.repeatEnd === bar.repeatEnd &&
+    next.endings.length === bar.endings.length &&
+    next.endings.every((n, i) => n === bar.endings[i])
+  ) {
+    return state;
+  }
+  return replaceBarValue(state, index, next);
 }
 
 /**

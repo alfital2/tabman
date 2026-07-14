@@ -26,6 +26,7 @@ import {
   placeCursor,
   redo,
   setBarPickup,
+  setBarRepeat,
   setBarTimeSignature,
   setChordAtCursor,
   setFretAtCursor,
@@ -919,5 +920,36 @@ describe('setBarPickup', () => {
     state = setBarPickup(state, 0, true);
     state = setBarTimeSignature(state, 0, createTimeSignature(3, 4));
     expect(state.score.tracks[0]!.bars[0]!.pickup).toBe(true);
+  });
+});
+
+describe('setBarRepeat', () => {
+  it('patches flags, undoably, preserving others', () => {
+    let state = emptyEditor();
+    state = setBarRepeat(state, 0, { repeatStart: true });
+    state = setBarRepeat(state, 1, { repeatEnd: 3, endings: [1] });
+    const bars = state.score.tracks[0]!.bars;
+    expect(bars[0]!.repeatStart).toBe(true);
+    expect(bars[1]!.repeatEnd).toBe(3);
+    expect(bars[1]!.endings).toEqual([1]);
+    state = setBarRepeat(state, 1, { endings: [] });
+    expect(state.score.tracks[0]!.bars[1]!.repeatEnd).toBe(3); // untouched by the patch
+    expect(state.score.tracks[0]!.bars[1]!.endings).toEqual([]);
+    state = undo(state);
+    expect(state.score.tracks[0]!.bars[1]!.endings).toEqual([1]);
+  });
+
+  it('no-ops on identical flags and bad indices', () => {
+    const state = emptyEditor();
+    expect(setBarRepeat(state, 0, { repeatStart: false })).toBe(state);
+    expect(setBarRepeat(state, 42, { repeatStart: true })).toBe(state);
+  });
+
+  it('editing notes keeps repeat flags (withVoiceBeats preservation)', () => {
+    let state = emptyEditor();
+    state = setBarRepeat(state, 0, { repeatStart: true, repeatEnd: 2 });
+    state = setFretAtCursor(state, 5, QUARTER);
+    expect(state.score.tracks[0]!.bars[0]!.repeatStart).toBe(true);
+    expect(state.score.tracks[0]!.bars[0]!.repeatEnd).toBe(2);
   });
 });

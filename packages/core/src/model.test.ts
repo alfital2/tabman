@@ -5,6 +5,7 @@ import { fraction, fractionEquals } from './fraction';
 import {
   barAdvanceWholes,
   barFilledInWholes,
+  barOptions,
   barHasRoomFor,
   clampTempo,
   createBar,
@@ -155,5 +156,40 @@ describe('pickup bars', () => {
       [createVoice([createBeat(HALF, [createNote(0, 1)])])],
     );
     expect(fractionEquals(barAdvanceWholes(overfull), fraction(1, 2))).toBe(true);
+  });
+});
+
+describe('repeat flags', () => {
+  it('default to off', () => {
+    const bar = createBar(FOUR_FOUR);
+    expect(bar.repeatStart).toBe(false);
+    expect(bar.repeatEnd).toBeNull();
+    expect(bar.endings).toEqual([]);
+  });
+
+  it('accepts flags and normalizes endings (sorted, unique, ints 1..9)', () => {
+    const bar = createBar(FOUR_FOUR, undefined, {
+      repeatStart: true,
+      repeatEnd: 3,
+      endings: [2, 1, 2, 0, 10, 1.5],
+    });
+    expect(bar.repeatStart).toBe(true);
+    expect(bar.repeatEnd).toBe(3);
+    expect(bar.endings).toEqual([1, 2]);
+  });
+
+  it('clamps repeat counts into 2..8 and rejects junk', () => {
+    expect(createBar(FOUR_FOUR, undefined, { repeatEnd: 1 }).repeatEnd).toBe(2);
+    expect(createBar(FOUR_FOUR, undefined, { repeatEnd: 99 }).repeatEnd).toBe(8);
+    expect(createBar(FOUR_FOUR, undefined, { repeatEnd: null }).repeatEnd).toBeNull();
+  });
+
+  it('barOptions round-trips every flag', () => {
+    const bar = createBar(FOUR_FOUR, undefined, { pickup: true, repeatStart: true, repeatEnd: 2, endings: [1] });
+    const copy = createBar(FOUR_FOUR, undefined, barOptions(bar));
+    expect(copy.pickup).toBe(true);
+    expect(copy.repeatStart).toBe(true);
+    expect(copy.repeatEnd).toBe(2);
+    expect(copy.endings).toEqual([1]);
   });
 });

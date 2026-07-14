@@ -1120,6 +1120,12 @@ body {
   color: #ffffff;
 }
 
+.menu-chip.active {
+  background: #24304f;
+  border-color: #3f74ff;
+  color: #9db8ff;
+}
+
 .menu-chip.glyph {
   display: flex;
   align-items: center;

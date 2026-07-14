@@ -277,3 +277,32 @@ describe('pickup bars', () => {
     expect(schedule.events[1]!.startSec).toBeCloseTo(2, 5);
   });
 });
+
+describe('repeats', () => {
+  // 120 bpm → whole 2 s, 4/4 bar = 2 s.
+  function repeatScore() {
+    const a = createBar(FOUR_FOUR, [createVoice([createBeat(QUARTER, [createNote(0, 1)])])], { repeatStart: true });
+    const b = createBar(FOUR_FOUR, [createVoice([createBeat(QUARTER, [createNote(0, 2)])])], { repeatEnd: 2 });
+    const c = createBar(FOUR_FOUR, [createVoice([createBeat(QUARTER, [createNote(0, 3)])])]);
+    return scoreOf(a, b, c);
+  }
+
+  it('unrolls |: A B :| ×2 into A B A B C with real timeline positions', () => {
+    const schedule = scheduleScore(repeatScore(), 120);
+    expect(schedule.events.map((e) => e.bar)).toEqual([0, 1, 0, 1, 2]);
+    expect(schedule.events.map((e) => e.startSec)).toEqual([0, 2, 4, 6, 8]);
+    expect(schedule.totalSec).toBeCloseTo(10, 5);
+  });
+
+  it('play-from starts at the first occurrence of the cursor bar', () => {
+    const schedule = scheduleScore(repeatScore(), 120, { fromBar: 1, fromBeat: 0 });
+    // From bar 1's first pass: B A B C remain.
+    expect(schedule.events.map((e) => e.bar)).toEqual([1, 0, 1, 2]);
+    expect(schedule.events[0]!.startSec).toBeCloseTo(0, 5);
+    expect(schedule.totalSec).toBeCloseTo(8, 5);
+  });
+
+  it('beatStartSeconds uses the unrolled timeline', () => {
+    expect(beatStartSeconds(repeatScore(), 120, 2, 0)).toBeCloseTo(8, 5);
+  });
+});

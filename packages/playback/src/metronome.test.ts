@@ -75,3 +75,14 @@ describe('pickup bars', () => {
     expect(clicks.filter((c) => c.timeSec < 0.5)).toHaveLength(1);
   });
 });
+
+describe('repeats', () => {
+  it('clicks through the unrolled sequence', () => {
+    // one 2/4 bar repeated ×2 → clicks at 0, .5, 1, 1.5 (120 bpm).
+    const bar = createBar(createTimeSignature(2, 4), undefined, { repeatStart: true, repeatEnd: 2 });
+    const score = createScore({ tempo: 120, tracks: [createTrack({ bars: [bar] })] });
+    const clicks = metronomeClicks(score, 120);
+    expect(clicks.map((c) => c.timeSec)).toEqual([0, 0.5, 1, 1.5]);
+    expect(clicks.map((c) => c.accent)).toEqual([true, false, true, false]);
+  });
+});

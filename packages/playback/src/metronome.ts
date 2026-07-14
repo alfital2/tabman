@@ -1,4 +1,4 @@
-import { barAdvanceWholes, fraction, fractionToNumber, compareFractions, type Score } from '@tabkit/core';
+import { barAdvanceWholes, fraction, fractionToNumber, compareFractions, unrollBars, type Score } from '@tabkit/core';
 import { beatStartSeconds, secondsPerWhole, type PlayFrom } from './schedule';
 
 export interface MetronomeClick {
@@ -20,7 +20,8 @@ export function metronomeClicks(score: Score, bpm: number, from?: PlayFrom): Met
 
   const clicks: MetronomeClick[] = [];
   let barStart = 0;
-  for (const bar of track.bars) {
+  for (const { barIndex } of unrollBars(track.bars)) {
+    const bar = track.bars[barIndex]!;
     const ts = bar.timeSignature;
     const beatSec = spw / ts.denominator;
     const advance = barAdvanceWholes(bar);

@@ -73,6 +73,10 @@ export function lineStyle(theme: Theme, role: LineRole): LineStyle {
       return { stroke: theme.slide, strokeWidth: 1 };
     case 'tupletBracket':
       return { stroke: theme.beam, strokeWidth: 0.8 };
+    case 'barlineThick':
+      return { stroke: theme.barline, strokeWidth: 3 };
+    case 'voltaBracket':
+      return { stroke: theme.barline, strokeWidth: 0.9 };
   }
 }
 
@@ -92,6 +96,10 @@ export function textStyle(theme: Theme, role: TextRole): TextStyle {
       return { fill: theme.articulation, fontFamily: theme.monoFontFamily, fontWeight: 'normal' };
     case 'tuplet':
       return { fill: theme.stem, fontFamily: theme.serifFontFamily, fontWeight: 'bold' };
+    case 'repeatCount':
+      return { fill: theme.barline, fontFamily: theme.monoFontFamily, fontWeight: 'bold' };
+    case 'volta':
+      return { fill: theme.barline, fontFamily: theme.serifFontFamily, fontWeight: 'bold' };
   }
 }
 

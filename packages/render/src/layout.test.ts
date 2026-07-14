@@ -254,3 +254,55 @@ describe('pickup bar numbering', () => {
     expect(numbers).toEqual(['1', '2']);
   });
 });
+
+describe('repeat marks', () => {
+  it('draws start/end repeat dots, a thick line, and a count label above ×3', () => {
+    const score = createScore({
+      tracks: [
+        createTrack({
+          bars: [
+            createBar(FOUR_FOUR, undefined, { repeatStart: true }),
+            createBar(FOUR_FOUR, undefined, { repeatEnd: 3 }),
+          ],
+        }),
+      ],
+    });
+    const layout = layoutScore(score);
+    const thick = layout.primitives.filter((p) => p.kind === 'line' && p.role === 'barlineThick');
+    expect(thick.length).toBeGreaterThanOrEqual(2); // one per repeat sign
+    const dots = layout.primitives.filter((p) => p.kind === 'ellipse' && p.role === 'dot');
+    expect(dots.length).toBeGreaterThanOrEqual(4); // two per repeat sign
+    const counts = layout.primitives.filter(
+      (p): p is TextPrimitive => p.kind === 'text' && p.role === 'repeatCount',
+    );
+    expect(counts.map((c) => c.text)).toEqual(['×3']);
+  });
+
+  it('omits the count label for a plain ×2', () => {
+    const score = createScore({
+      tracks: [createTrack({ bars: [createBar(FOUR_FOUR, undefined, { repeatEnd: 2 })] })],
+    });
+    const layout = layoutScore(score);
+    expect(layout.primitives.some((p) => p.kind === 'text' && p.role === 'repeatCount')).toBe(false);
+  });
+
+  it('draws one volta bracket per contiguous equal-endings group', () => {
+    const score = createScore({
+      tracks: [
+        createTrack({
+          bars: [
+            createBar(FOUR_FOUR, undefined, { repeatStart: true }),
+            createBar(FOUR_FOUR, undefined, { repeatEnd: 2, endings: [1] }),
+            createBar(FOUR_FOUR, undefined, { endings: [2] }),
+            createBar(FOUR_FOUR, undefined, { endings: [2] }),
+          ],
+        }),
+      ],
+    });
+    const layout = layoutScore(score);
+    const voltas = layout.primitives.filter(
+      (p): p is TextPrimitive => p.kind === 'text' && p.role === 'volta',
+    );
+    expect(voltas.map((v) => v.text)).toEqual(['1.', '2.']);
+  });
+});

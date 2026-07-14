@@ -1,5 +1,14 @@
-export type LineRole = 'staff' | 'barline' | 'stem' | 'beam' | 'slide' | 'tupletBracket';
-export type TextRole = 'fret' | 'measureNumber' | 'clef' | 'timeSignature' | 'articulation' | 'chordName' | 'tuplet';
+export type LineRole = 'staff' | 'barline' | 'stem' | 'beam' | 'slide' | 'tupletBracket' | 'barlineThick' | 'voltaBracket';
+export type TextRole =
+  | 'fret'
+  | 'measureNumber'
+  | 'clef'
+  | 'timeSignature'
+  | 'articulation'
+  | 'chordName'
+  | 'tuplet'
+  | 'repeatCount'
+  | 'volta';
 export type RectRole = 'fretBackground';
 export type PathRole = 'bend' | 'vibrato' | 'rest';
 

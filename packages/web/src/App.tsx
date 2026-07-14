@@ -31,6 +31,7 @@ import {
   replaceBarValue,
   segmentsForCells,
   setBarPickup,
+  setBarRepeat,
   setBarTimeSignature,
   setBeatsDuration,
   setChordAtCursor,
@@ -473,6 +474,9 @@ export function App(): JSX.Element {
         }}
         onTogglePickup={(index, pickup) => {
           apply(setBarPickup(stateRef.current, index, pickup));
+        }}
+        onSetRepeat={(index, patch) => {
+          apply(setBarRepeat(stateRef.current, index, patch));
         }}
         onAddChord={(cell) => {
           setMenu(null);

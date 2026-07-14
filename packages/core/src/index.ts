@@ -6,3 +6,4 @@ export * from './articulation';
 export * from './chords';
 export * from './model';
 export * from './editor';
+export * from './repeats';
